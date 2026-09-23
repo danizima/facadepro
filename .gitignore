@@ -1,0 +1,10 @@
+data/
+.env
+.env.*
+!.env.example
+node_modules/
+.sites-runtime/
+__pycache__/
+*.pyc
+site/_qa*
+*.sqlite*
