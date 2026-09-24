@@ -21,10 +21,11 @@ def safe_project(p):
  return out
 P=[safe_project(p) for p in P]
 ARROW='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14"/></svg>'
-CATEGORIES={'Культурная инфраструктура':'culture','Гостиничные комплексы':'hotels','Жилые комплексы':'housing','Строительство':'construction'}
+CATEGORIES={'Культурная инфраструктура':'culture','Гостиничные комплексы':'hotels','Жилые комплексы':'housing','Строительство':'construction','Общественные объекты':'public'}
 PBY={p['id']:p for p in P}
 pages=[]
 def img(key,alt,base='',eager=False,sizes=None,full=False):
+ if not key:return f'<img class="project-cover-placeholder" src="{base}assets/project-summary.svg" alt="{e(alt)} — описание проекта" width="1200" height="800" loading="lazy">'
  url=base+key if key.startswith("media/") else base+"assets/"+key+".webp"
  width,height=IMAGE_SIZES.get(key,[1200,900])
  priority=' fetchpriority="high"' if eager else ''
@@ -65,7 +66,7 @@ def intro(kicker,title,text,breadcrumb=None):
  return f'<section class="page-intro">{crumb}<p class="eyebrow">{kicker}</p><div class="intro-grid"><h1>{title}</h1><p>{text}</p></div></section>'
 def card(p,base='',catalog=False,slot=0):
  data=f' data-services="{e(" ".join(p.get("serviceIds",[])))}" data-city="{e(release8.city(p))}" data-category="{CATEGORIES[p["type"]]}" data-search="{e((p["title"]+" "+p["location"]+" "+p["work"]).lower())}"' if catalog else ''
- return f'<article class="project-card" data-project-id="{p["id"]}" data-slot="{slot}"{data}><a class="project-open" href="{base}projects/{p["id"]}.html"><span class="project-image">{img(p["images"][0],p["title"],base)}<span class="project-tag">{p["volume"]}</span><span class="project-arrow">{ARROW}</span><span class="project-image-cta">Посмотреть объект</span></span><span class="project-meta">{p["type"]}<span>{p["location"].split(",")[0]}</span></span><h3>{p["title"]}</h3></a>{release8.card_details(globals(),p,base,catalog)}</article>'
+ return f'<article class="project-card" data-project-id="{p["id"]}" data-slot="{slot}"{data}><a class="project-open" href="{base}projects/{p["id"]}.html"><span class="project-image">{img((p["images"] or [None])[0],p["title"],base)}<span class="project-tag">{p["volume"]}</span><span class="project-arrow">{ARROW}</span><span class="project-image-cta">Посмотреть объект</span></span><span class="project-meta">{p["type"]}<span>{p["location"].split(",")[0]}</span></span><h3>{p["title"]}</h3></a>{release8.card_details(globals(),p,base,catalog)}</article>'
 def services(base=''):
  return visual5.service_cards(globals(),base)
 def strip(title,text,base=''):
@@ -78,7 +79,7 @@ home=re.search(r'<main id="main">(.*?)</main>',old,re.S).group(1)
 home=home.replace('<div class="company-footnote">', '<a class="text-button company-link" href="about.html">Подробнее о команде '+ARROW+'</a><div class="company-footnote">')
 home=release6.home(globals(),visual5.home(globals(),home))
 page('index.html','Фасадные работы и сложное остекление','Фасадное остекление, оконные системы, ремонт и восстановление фасадов. 180 монтажников, 63 собственных подъёмника. Работаем по всей России.',home+faqblock())
-filters=[('all','Все проекты',len(P))]+[(key,label,sum(CATEGORIES[p['type']]==key for p in P)) for key,label in [('housing','Жилые комплексы'),('hotels','Гостиницы'),('culture','Культура'),('construction','Строительство')]]
+filters=[('all','Все проекты',len(P))]+[(key,label,sum(CATEGORIES[p['type']]==key for p in P)) for key,label in [('housing','Жилые комплексы'),('hotels','Гостиницы'),('culture','Культура'),('construction','Строительство'),('public','Общественные объекты')]]
 controls=f'<div class="catalog-tools js-only"><div class="filter-list" role="group" aria-label="Тип объекта">'+''.join(f'<button class="filter-button" data-filter="{key}" aria-pressed="{str(key=="all").lower()}">{label}<span>{count}</span></button>' for key,label,count in filters)+'</div><label class="search-field"><span>Поиск по проектам</span><input id="project-search" type="search" placeholder="Название, адрес или вид работ" autocomplete="off"></label><div class="catalog-status"><p id="results-count" role="status" aria-live="polite">Показано проектов: '+str(len(P))+'</p><button class="text-button" id="reset-filters" type="button" hidden>Сбросить фильтры ×</button></div></div>'
 page('projects.html','Проекты',f'{len(P)} проектов ФАСАД.PRO: жилые комплексы, гостиницы, культурная инфраструктура и строительство.',intro(f'Портфолио / {len(P)} объектов','Работа, которую<br>можно увидеть.','От оконных систем жилых кварталов до сложной геометрии общественных зданий.')+'<section class="section catalog-section" aria-label="Каталог проектов">'+controls.replace('<div class="catalog-status">',release8.catalog_filters(globals())+'<div class="catalog-status">')+'<div class="project-grid catalog-grid editorial-grid">'+''.join(card(p,catalog=True,slot=i%4) for i,p in enumerate(P))+'</div><div class="empty-state" id="empty-results" hidden><h2>Проектов не найдено</h2><p>Попробуйте другое название или сбросьте фильтры.</p><button type="button" class="button" data-reset-filters>Показать все проекты</button></div></section>'+strip('У вас похожая задача?','Расскажите об объекте — обсудим подход к работам.'),'projects')
 for i,p in enumerate(P):

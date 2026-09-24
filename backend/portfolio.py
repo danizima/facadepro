@@ -55,9 +55,9 @@ def render(job):
  doc=SimpleDocTemplate(result,pagesize=A4,rightMargin=M,leftMargin=M,topMargin=78,bottomMargin=61,title='ФАСАД.PRO - персональное портфолио',author='ФАСАД.PRO',pageCompression=1)
  story=[para('ПЕРСОНАЛЬНОЕ ПОРТФОЛИО','kicker'),para(s['slogan'],'title')]
  if recipient:story+=[para(recipient,'large')]
- story += [Spacer(1,8),picture(projects[0]['images'][0],235),Spacer(1,25),para(f'Объектов в подборке: {len(projects)}','kicker'),para('Опыт, который можно увидеть.','large'),para('Подборка выполненных и действующих проектов. Состав и период нашего участия указаны на страницах объектов.','body'),Spacer(1,14),para(s['manager'],'large'),para(s['phone']+'  ·  '+s['email'],'small'),PageBreak()]
+ story += [Spacer(1,8),*([picture(projects[0]['images'][0],235)] if projects[0]['images'] else []),Spacer(1,25),para(f'Объектов в подборке: {len(projects)}','kicker'),para('Опыт, который можно увидеть.','large'),para('Подборка выполненных и действующих проектов. Состав и период нашего участия указаны на страницах объектов.','body'),Spacer(1,14),para(s['manager'],'large'),para(s['phone']+'  ·  '+s['email'],'small'),PageBreak()]
  for p in projects:
-  story += [para(p['type'].upper(),'kicker'),para(p['title'],'project'),para(p['location'],'small'),Spacer(1,10),picture(p['images'][0]),Spacer(1,20)]
+  story += [para(p['type'].upper(),'kicker'),para(p['title'],'project'),para(p['location'],'small'),Spacer(1,10),*([picture(p['images'][0])] if p['images'] else []),Spacer(1,20)]
   facts=[['Объём / участие',p['volume']],['Период / срок',p['period']]]
   if p.get('client'):facts.append(['Заказчик',p['client']])
   table=Table([[para(label,'label'),para(value,'fact')] for label,value in facts],colWidths=[125,CW-125],hAlign='LEFT')

@@ -2,7 +2,7 @@
 (()=>{
  const $=s=>document.querySelector(s),all=s=>[...document.querySelectorAll(s)];
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const asset=key=>window.facadeAsset?.(key)||(key.startsWith('media/')?key:'assets/'+key+'.webp');
+ const asset=key=>window.facadeAsset?.(key)||(!key?'assets/project-summary.svg':key.startsWith('media/')?key:'assets/'+key+'.webp');
  const data=$('#release-data')?JSON.parse($('#release-data').textContent):null;
  const offline=window.facade?.offline;
  const tabs=all('[data-slide]');

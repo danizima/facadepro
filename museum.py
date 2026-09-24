@@ -18,10 +18,10 @@ def enrich(g, p, body, dialog):
     """Keep the CMS-controlled case and gallery; add a bespoke opening and journal."""
     REPORTS = [r for r in p.get('reports', []) if r.get('published', True)]
     e, img, arrow = g['e'], g['img'], g['ARROW']
-    cover_report = next((r for r in REPORTS if any(photo['key'] == p['images'][0] for photo in r['photos'])), None)
+    cover_report = next((r for r in REPORTS if any(photo['key'] == (p['images'] or [None])[0] for photo in r['photos'])), None)
     cover_credit = ('Фото: ' + e(cover_report['credit']) + (' · съёмка ' if cover_report.get('dateKind') == 'shooting' else ' · публикация ') + '.'.join(reversed(cover_report['publishedAt'].split('-')))) if cover_report else 'Из портфолио компании'
     opening = f'''<section class="museum-opening"><nav class="breadcrumbs" aria-label="Хлебные крошки"><a href="../index.html">Главная</a><span>/</span><a href="../projects.html">Проекты</a></nav><div class="museum-kicker"><p class="eyebrow">Наш крупнейший проект</p><span>{p['period']}</span></div><div class="museum-heading"><h1>{p['title']}</h1><div><p>Сложная геометрия.<br>Светопрозрачный фасад.<br>Масштаб, который виден городу.</p><a class="text-button" href="#reports">Фотоотчёты ↓</a></div></div><p class="museum-address">{p['location']}</p></section>
-    <figure class="museum-cover">{img(p['images'][0],p['title']+' — общий вид','../',True)}<div class="museum-cover-metric"><span class="eyebrow">Объём нашего участия</span><strong>{p['volume']}</strong><a href="#participation">О работах ФАСАД.PRO ↓</a></div><figcaption><span>Объект в городском пейзаже</span><span>{cover_credit}</span></figcaption></figure>
+    <figure class="museum-cover">{img((p['images'] or [None])[0],p['title']+' — общий вид','../',True)}<div class="museum-cover-metric"><span class="eyebrow">Объём нашего участия</span><strong>{p['volume']}</strong><a href="#participation">О работах ФАСАД.PRO ↓</a></div><figcaption><span>Объект в городском пейзаже</span><span>{cover_credit}</span></figcaption></figure>
     <nav class="museum-nav" aria-label="Разделы проекта"><a href="#participation">Наше участие</a><a href="#reports">Фотоотчёты <span>{len(REPORTS):02}</span></a><a href="#project-gallery">Детали объекта</a><a href="../request.html">Обсудить похожий проект {arrow}</a></nav>'''
     if not REPORTS:
         opening = opening.replace('<a class="text-button" href="#reports">Фотоотчёты ↓</a>', '').replace('<a href="#reports">Фотоотчёты <span>00</span></a>', '')

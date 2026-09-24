@@ -26,8 +26,8 @@ export async function verifyRelease10({page,base,shots}){
   await page.goto(base+'/projects.html',{waitUntil:'networkidle'});
   const details=page.locator('.catalog-more');assert.equal(await details.getAttribute('open')!==null,width>800);
   if(width<=800)await details.locator('summary').click();
-  await page.locator('#catalog-service').selectOption('repair');assert.equal(await page.locator('.catalog-grid .project-card:visible').count(),2);
-  await page.locator('#reset-filters').click();assert.equal(await page.locator('.catalog-grid .project-card:visible').count(),11);
+  await page.locator('#catalog-service').selectOption('repair');assert.equal(await page.locator('.catalog-grid .project-card:visible').count(),3);
+  await page.locator('#reset-filters').click();assert.equal(await page.locator('.catalog-grid .project-card:visible').count(),12);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'catalog fits '+width);
   if(width===1440||width===390)await page.screenshot({path:path.join(shots,'catalog-v10-'+(width===1440?'desktop':'mobile')+'.png'),fullPage:width===390});
   for(const route of ['/projects/museum.html','/projects/restaurant.html','/services.html','/request.html']){

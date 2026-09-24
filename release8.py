@@ -5,7 +5,7 @@ import html
 
 
 def city(p):
-    return p.get('geo', {}).get('label') or html.unescape(p['location']).split(',')[0].strip()
+    return (p.get('geo') or {}).get('label') or html.unescape(p['location']).split(',')[0].strip()
 
 
 def compare_button(g, p):

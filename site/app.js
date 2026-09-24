@@ -34,8 +34,8 @@ if($('#project-search')){
  $('#reset-filters').addEventListener('click',reset);$('[data-reset-filters]').addEventListener('click',reset);filter(false);
 }
 // Project photography: thumbnails and a keyboard-accessible native dialog.
-if($('.project-gallery')){
- const gallery=$('.project-gallery'),keys=JSON.parse(gallery.dataset.gallery),dialog=$('.lightbox');
+if($('.project-gallery[data-gallery]')){
+ const gallery=$('.project-gallery[data-gallery]'),keys=JSON.parse(gallery.dataset.gallery),dialog=$('.lightbox');
  const stage=$('.gallery-stage>img'),large=$('.lightbox-image'),thumbs=$$('[data-image]');let index=0,opener=$('.gallery-zoom');
  const asset=key=>window.facadeAsset?window.facadeAsset(key):document.body.dataset.base+(key.startsWith('media/')?key:'assets/'+key+'.webp');
  function display(next){index=(next+keys.length)%keys.length;stage.removeAttribute('srcset');stage.removeAttribute('sizes');stage.src=asset(keys[index]);large.src=stage.src;stage.alt=large.alt=gallery.dataset.title+`. Фотография ${index+1}`;$('.gallery-position').textContent=$('.lightbox-counter').textContent=`${index+1} / ${keys.length}`;thumbs.forEach((b,i)=>b.setAttribute('aria-pressed',String(i===index)));}

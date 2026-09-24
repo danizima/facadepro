@@ -1,7 +1,7 @@
 (() => {
  'use strict';
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const image=key=>key.startsWith('media/')?'/'+key:'/assets/'+key+'.webp';
+ const image=key=>!key?'/assets/project-summary.svg':key.startsWith('media/')?'/'+key:'/assets/'+key+'.webp';
  const download=async(ids,status)=>{status.textContent='Готовим PDF…';const r=await fetch('/api/portfolio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projects:ids,recipient:''}),signal:AbortSignal.timeout(65000)});if(!r.ok)throw Error((await r.json()).error||'Не удалось подготовить PDF.');const url=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=url;a.download='ФАСАД_PRO_проекты.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);status.textContent='PDF готов.';};
  const callbackSection=document.querySelector('.callback-section');
  if(callbackSection&&'IntersectionObserver' in window)new IntersectionObserver(entries=>document.body.classList.toggle('callback-in-view',entries[0].isIntersecting),{threshold:0}).observe(callbackSection);

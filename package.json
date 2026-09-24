@@ -1,14 +1,14 @@
 {
   "name": "facadepro-website",
-  "version": "10.1.0",
+  "version": "10.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "node server.mjs",
     "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check backend/store.mjs && node --check site/app.js && node --check site/public.js && node --check site/request.js && node --check site/admin/admin.js && node --check site/release4.js && node --check backend/followups.mjs && node --check backend/portfolio.mjs && node --check scripts/admin-demo.js && node --check site/visual5.js && node --check site/museum.js && node --check backend/content6.mjs && node --check backend/showcases.mjs && node --check backend/notifications.mjs && node --check site/release6.js && node --check site/admin/release6.js && node --check backend/content7.mjs && node --check site/release7.js && node --check site/admin/release7.js && node --check site/release8.js && node --check site/release9.js && node --check backend/kit.mjs && node --check backend/public-files.mjs && node --check site/visual10.js",
+    "check": "node --check server.mjs && node --check backend/store.mjs && node --check site/app.js && node --check site/public.js && node --check site/request.js && node --check site/admin/admin.js && node --check site/release4.js && node --check backend/followups.mjs && node --check backend/portfolio.mjs && node --check scripts/admin-demo.js && node --check site/visual5.js && node --check site/museum.js && node --check backend/content6.mjs && node --check backend/showcases.mjs && node --check backend/notifications.mjs && node --check site/release6.js && node --check site/admin/release6.js && node --check backend/content7.mjs && node --check site/release7.js && node --check site/admin/release7.js && node --check site/release8.js && node --check site/release9.js && node --check backend/kit.mjs && node --check backend/public-files.mjs && node --check site/visual10.js && node --check backend/portfolio-update.mjs",
     "build": "python3 build.py",
-    "test": "node tests/integration.mjs && node tests/release6.mjs && python3 tests/update-timeweb.py && node tests/release7.mjs && python3 tests/autodeploy.py && node tests/release9.mjs",
+    "test": "node tests/integration.mjs && node tests/release6.mjs && python3 tests/update-timeweb.py && node tests/release7.mjs && python3 tests/autodeploy.py && node tests/release9.mjs && node tests/portfolio-update.mjs",
     "admin:create": "node scripts/create-admin.mjs"
   },
   "engines": {

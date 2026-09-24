@@ -30,7 +30,7 @@ export function getShowcase(token){
  return {...row,projects,settings:all.settings};
 }
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const photo=key=>key.startsWith('media/')?'/'+key:'/assets/'+key+'.webp';
+const photo=key=>!key?'/assets/project-summary.svg':key.startsWith('media/')?'/'+key:'/assets/'+key+'.webp';
 export function closedShowcaseHTML(){return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Подборка недоступна — ФАСАД.PRO</title><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/enhancements.css"><link rel="stylesheet" href="/release6.css"></head><body><main class="selection-intro"><p class="eyebrow">ФАСАД.PRO</p><h1>Эта подборка уже недоступна</h1><p>Свяжитесь с менеджером, чтобы получить актуальное портфолио для вашего объекта.</p><div class="selection-actions"><a class="button" href="/request.html">Запросить подборку ↗</a><a class="text-button" href="/projects.html">Посмотреть проекты</a></div></main></body></html>';}
 export function showcaseHTML(s){
  const cards=s.projects.map((p,i)=>'<article class="selection-card"><a href="/projects/'+p.id+'.html"><img src="'+photo(p.images[0])+'" alt="'+esc(p.title)+'" loading="lazy" width="1200" height="800"></a><div><span class="eyebrow">'+String(i+1).padStart(2,'0')+' / '+esc(p.type)+'</span><h2>'+esc(p.title)+'</h2><p>'+esc(p.location)+'</p><strong>'+esc(p.volume)+'</strong><p>'+esc(p.work)+'</p><a class="text-button" href="/projects/'+p.id+'.html">История проекта ↗</a></div></article>').join('');

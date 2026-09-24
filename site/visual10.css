@@ -30,3 +30,6 @@ html{scroll-padding-top:100px}body{font-family:Arial,Helvetica,sans-serif}a,butt
 
 /* Native controls follow the monochrome brand palette. */
 input[type=checkbox],input[type=radio],input[type=range]{accent-color:var(--ink)}
+
+/* Text-only cases use a neutral brand cover until real project photos are added. */
+.project-cover-placeholder{object-fit:contain!important;background:#ededed}.case-summary{margin:0 var(--gutter) 32px;padding:42px;background:#eeeeee;border-radius:9px}.case-summary>p:last-child{font-size:clamp(22px,3vw,38px);line-height:1.35;max-width:1000px;margin-top:20px}.case-narrative-story p{white-space:pre-line}@media(max-width:600px){.case-summary{padding:24px;margin-bottom:20px}.case-summary>p:last-child{font-size:23px}}

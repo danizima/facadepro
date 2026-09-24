@@ -7,7 +7,7 @@
   const form = document.querySelector('#request-form');
   const query = new URLSearchParams(window.facadeQuery ?? location.search);
   const key = 'facade_compare';
-  const asset = p => window.facadeAsset ? window.facadeAsset(p.image || p.images[0]) : base + ((p.image || p.images[0]).startsWith('media/') ? (p.image || p.images[0]) : 'assets/' + (p.image || p.images[0]) + '.webp');
+  const asset = p => { const key=p.image || p.images?.[0]; return window.facadeAsset ? window.facadeAsset(key) : base + (!key ? 'assets/project-summary.svg' : key.startsWith('media/') ? key : 'assets/' + key + '.webp'); };
   let projectsPromise;
   const projects = () => projectsPromise ||= (window.facade?.offline
     ? Promise.resolve(data.projects)

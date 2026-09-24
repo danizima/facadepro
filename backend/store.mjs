@@ -1,5 +1,6 @@
 import {upgradeContent,validateExtras,validateWorkflow} from './content6.mjs';
 import {validateMaterials} from './content7.mjs';
+import {applyPortfolioUpdate} from './portfolio-update.mjs';
 import {DatabaseSync} from 'node:sqlite';
 import {mkdirSync,readFileSync,writeFileSync,existsSync} from 'node:fs';
 import path from 'node:path';
@@ -32,6 +33,7 @@ for(const column of ['assignee','next_contact','next_action'])if(!leadColumns.ha
 db.exec('CREATE INDEX IF NOT EXISTS leads_followup ON leads(next_contact,status,assignee)');
 const seedContent=JSON.parse(readFileSync(path.join(ROOT,'source/content.json'),'utf8'));
 if(!db.prepare('SELECT id FROM content WHERE id=1').get())db.prepare('INSERT INTO content VALUES(1,1,?)').run(readFileSync(path.join(ROOT,'source/content.json'),'utf8'));
+applyPortfolioUpdate(db,JSON.parse(readFileSync(path.join(ROOT,'source/portfolio-update10-2.json'),'utf8')));
 export const hash=x=>createHash('sha256').update(x).digest('hex');
 export const privateHash=x=>createHmac('sha256',secret).update(x).digest('hex');
 export function passwordHash(password){const salt=randomBytes(16).toString('hex');return salt+':'+scryptSync(password,salt,64).toString('hex');}
@@ -42,7 +44,7 @@ export function rate(key,max,windowMs){const now=Date.now(),k=privateHash(key);l
 export function cleanSession(){db.prepare('DELETE FROM sessions WHERE expires<?').run(Date.now());db.prepare('DELETE FROM rate_limits WHERE expires<?').run(Date.now());}
 export function transaction(fn){db.exec('BEGIN IMMEDIATE');try{const r=fn();db.exec('COMMIT');return r;}catch(e){db.exec('ROLLBACK');throw e;}}
 export const SERVICE_IDS=['glazing','windows','repair','engineering','supply','height'];
-export const CATEGORIES=['Культурная инфраструктура','Гостиничные комплексы','Жилые комплексы','Строительство'];
+export const CATEGORIES=['Культурная инфраструктура','Гостиничные комплексы','Жилые комплексы','Строительство','Общественные объекты'];
 export const STATUSES={new:'Новая',review:'На рассмотрении',estimate:'Готовим КП',sent:'КП отправлено',won:'Договор',closed:'Закрыта'};
 export function fail(status,message){return Object.assign(new Error(message),{status});}
 export function text(value,max,required=false){if(typeof value!=='string'||value.length>max||(required&&!value.trim())||/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value))throw fail(422,'Проверьте заполнение полей.');return value.trim();}
@@ -59,7 +61,7 @@ export function validateContent(input){
   if(!CATEGORIES.includes(out.type))throw fail(422,'Выберите тип объекта.');
   const serviceList=p.serviceIds??[];if(!Array.isArray(serviceList)||serviceList.length>6||serviceList.some(x=>!SERVICE_IDS.includes(x)))throw fail(422,'Выберите направления проекта.');out.serviceIds=[...new Set(serviceList)];
   out.geo=null;if(p.geo!==undefined&&p.geo!==null){const g=p.geo;if(typeof g.lat!=='number'||typeof g.lng!=='number'||!Number.isFinite(g.lat)||!Number.isFinite(g.lng)||Math.abs(g.lat)>90||Math.abs(g.lng)>180||!['city','exact'].includes(g.precision))throw fail(422,'Проверьте координаты и точность отметки.');out.geo={lat:g.lat,lng:g.lng,label:text(g.label,100,true),precision:g.precision};}
-  if(!Array.isArray(p.images)||p.images.length<1||p.images.length>12||p.images.some(x=>!/^([a-z0-9-]+|media\/[a-f0-9-]+\.(png|jpg|webp))$/.test(x)))throw fail(422,'Добавьте от 1 до 12 фотографий.');
+  if(!Array.isArray(p.images)||p.images.length>12||p.images.some(x=>!/^([a-z0-9-]+|media\/[a-f0-9-]+\.(png|jpg|webp))$/.test(x)))throw fail(422,'Допустимо до 12 фотографий.');
   out.images=p.images;out.case={};for(const key of ['task','challenge','solution','result'])out.case[key]=text(p.case?.[key]||'',2500);
   Object.assign(out,validateExtras(p));
   return out;

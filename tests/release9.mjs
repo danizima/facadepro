@@ -25,7 +25,7 @@ try{
  const head=await fetch(base+'/'+bundle,{method:'HEAD',headers:{'Accept-Encoding':'gzip'}});assert.equal(await head.text(),'');assert.equal(head.headers.get('content-length'),gzip.headers.get('content-length'));
  const adminPage=await call('/admin/');assert.equal(adminPage.headers.get('cache-control'),'no-store');assert.equal(adminPage.headers.get('etag'),null);
  const sitemap=await(await call('/sitemap.xml')).text();for(const task of ['new','repair','leak','glass','height']){const route='/tasks/'+task+'.html';assert.ok(sitemap.includes(route));assert.match(await(await call(route)).text(),new RegExp('request.html\\?solution='+task));}
- const available=await(await call('/api/public/contractor-kit')).json();assert.equal(available.projects.length,11);assert.deepEqual(available.documents,[]);
+ const available=await(await call('/api/public/contractor-kit')).json();assert.equal(available.projects.length,12);assert.deepEqual(available.documents,[]);
  for(const input of [kit([],[],false),kit(['missing']),kit(['museum','museum']),kit([],['../uploads/x']),{...kit(),profile:'true'}])assert.equal((await call('/api/contractor-kit',input)).status,422);
  const response=await call('/api/contractor-kit',kit(['museum','restaurant']));assert.equal(response.status,200,await response.clone().text());assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('content-type'),'application/zip');
  const zip=Buffer.from(await response.arrayBuffer()),out=path.join(root,'artifacts/pdf-v9');await mkdir(out,{recursive:true});await writeFile(path.join(out,'contractor-kit.zip'),zip);

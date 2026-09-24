@@ -13,7 +13,7 @@ export async function verifyRelease8({page, base, shots}) {
   await page.locator('#project-search').fill('невозможный-поиск');
   assert.equal(await visible.count(), 0);
   await page.locator('[data-reset-filters]').click();
-  assert.equal(await visible.count(), 11);
+  assert.equal(await visible.count(), 12);
   assert.equal(new URL(page.url()).search, '');
   const select = id => page.locator('.catalog-grid [data-select-compare="' + id + '"]');
   await select('museum').click(); await select('burny').click(); await select('restaurant').click();

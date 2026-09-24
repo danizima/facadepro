@@ -16,7 +16,7 @@ def hero(g):
     if not projects:return '<section class="empty-hero section"><h1>'+g['e'](g['CFG']['slogan'])+'</h1>'+g['button']('Обсудить объект','request.html',True)+'</section>'
     slides=[];tabs=[]
     for i,p in enumerate(projects):
-        photo=g['img'](p['images'][0],p['title'],eager=i==0,full=True)
+        photo=g['img']((p['images'] or [None])[0],p['title'],eager=i==0,full=True)
         slides.append(f'''<div class="architecture-slide" id="hero-panel-{i}" role="tabpanel" aria-labelledby="hero-tab-{i}" {'hidden' if i else ''}><a class="hero-photo-link" href="projects/{p['id']}.html" aria-label="Смотреть проект: {g['e'](p['title'])}">{photo}<span class="hero-photo-open">Смотреть объект {g['ARROW']}</span></a><a href="projects/{p['id']}.html" class="architecture-caption"><div><span class="eyebrow">{'Наш крупнейший проект' if p['id']=='museum' else p['type']}</span><strong>{p['title']}</strong></div><span class="architecture-caption-bottom"><span>{p['volume']}</span>{g['ARROW']}</span></a></div>''')
         tabs.append(f'<button type="button" role="tab" data-hero-tab="{i}" id="hero-tab-{i}" aria-controls="hero-panel-{i}" aria-selected="{str(i==0).lower()}" tabindex="{0 if i==0 else -1}"><span>0{i+1}</span><span>{p["title"]}</span></button>')
     slogan=g['e'](g['CFG']['slogan']).replace(' любой ',' <br>любой ')
@@ -31,7 +31,7 @@ def enhance(g,route,body):
     if route.startswith('projects/') and route!='projects/museum.html':
         project=g['PBY'].get(route.split('/')[-1][:-5])
         if project:
-            items=[('project-photos','Фотографии'),('participation','Состав работ')]
+            items=([('project-photos','Фотографии')] if project['images'] else [])+[('participation','Состав работ')]
             if 'id="reports"' in body:items.append(('reports','Фотоотчёты'))
             if 'id="stages"' in body:items.append(('stages','Этапы'))
             body=body.replace('<section class="project-gallery','<section id="project-photos" class="project-gallery',1)

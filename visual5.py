@@ -19,9 +19,9 @@ def image_for_service(g, service):
     project = g['PBY'].get(project_id)
     if not project:
         project = next((p for p in g['P'] if service['id'] in p.get('serviceIds', [])), None)
-    if not project:
+    if not project or not project['images']:
         return None
-    return project, key if key in project['images'] else project['images'][0]
+    return project, key if key in project['images'] else (project['images'] or [None])[0]
 
 
 def hero(g):
@@ -80,8 +80,11 @@ def comparison(g, p):
 def project(g, p, index):
     img, e, arrow = g['img'], g['e'], g['ARROW']
     body = f'''<section class="case-intro"><nav class="breadcrumbs" aria-label="Хлебные крошки"><a href="../index.html">Главная</a><span>/</span><a href="../projects.html">Проекты</a></nav><div class="case-intro-top"><p class="eyebrow">{p['type']}</p><span class="case-number">{index+1:02} / {len(g['P']):02}</span></div><h1>{p['title']}</h1><div class="case-intro-bottom"><p>{p['location']}</p><a class="text-button" href="#participation">Наше участие ↓</a></div></section>'''
-    thumbs = ''.join(f'<button type="button" class="gallery-thumb js-only" data-image="{j}" aria-label="Фотография {j+1}" aria-pressed="{str(j==0).lower()}">{img(key,p["title"]+f". Фото {j+1}","../")}</button>' for j,key in enumerate(p['images']))
-    body += f'''<section class="project-gallery visual-gallery" data-gallery='{e(json.dumps(p['images']))}' data-title="{e(p['title'])}" aria-label="Фотографии объекта"><div class="gallery-stage" tabindex="0" role="group" aria-label="Галерея проекта. Используйте стрелки для смены фотографии">{img(p['images'][0],p['title'],'../',True)}<button class="gallery-zoom js-only" type="button" aria-label="Увеличить фотографию">Развернуть {arrow}</button><div class="stage-gallery-controls js-only"><button type="button" data-gallery-step="-1" aria-label="Предыдущая фотография объекта">←</button><span class="gallery-position" aria-live="polite">1 / {len(p['images'])}</span><button type="button" data-gallery-step="1" aria-label="Следующая фотография объекта">→</button></div></div><div class="gallery-ribbon"><p><span class="eyebrow">{p['title']}</span><span class="gallery-hint">{'Листайте фотографии или откройте на весь экран' if len(p['images'])>1 else 'Откройте фотографию на весь экран'}</span></p><div class="gallery-thumbs">{thumbs}</div></div></section>'''
+    if p['images']:
+        thumbs = ''.join(f'<button type="button" class="gallery-thumb js-only" data-image="{j}" aria-label="Фотография {j+1}" aria-pressed="{str(j==0).lower()}">{img(key,p["title"]+f". Фото {j+1}","../")}</button>' for j,key in enumerate(p['images']))
+        body += f'''<section class="project-gallery visual-gallery" data-gallery='{e(json.dumps(p['images']))}' data-title="{e(p['title'])}" aria-label="Фотографии объекта"><div class="gallery-stage" tabindex="0" role="group" aria-label="Галерея проекта. Используйте стрелки для смены фотографии">{img((p['images'] or [None])[0],p['title'],'../',True)}<button class="gallery-zoom js-only" type="button" aria-label="Увеличить фотографию">Развернуть {arrow}</button><div class="stage-gallery-controls js-only"><button type="button" data-gallery-step="-1" aria-label="Предыдущая фотография объекта">←</button><span class="gallery-position" aria-live="polite">1 / {len(p['images'])}</span><button type="button" data-gallery-step="1" aria-label="Следующая фотография объекта">→</button></div></div><div class="gallery-ribbon"><p><span class="eyebrow">{p['title']}</span><span class="gallery-hint">{'Листайте фотографии или откройте на весь экран' if len(p['images'])>1 else 'Откройте фотографию на весь экран'}</span></p><div class="gallery-thumbs">{thumbs}</div></div></section>'''
+    else:
+        body += '<section class="project-gallery case-summary"><p class="eyebrow">Состав нашего участия</p><p>'+e(p['work'])+'</p></section>'
     repeats_period = p['volume'].casefold() in p['period'].casefold()
     metric_label = 'Срок строительства' if repeats_period else ('Объём участия' if 'м²' in p['volume'] else 'Наше участие')
     second_label, second_value = ('Направление', p['type']) if repeats_period else ('Период / срок', p['period'])
@@ -107,9 +110,10 @@ def project(g, p, index):
     if related:
         body += '<section class="section case-related"><div class="section-heading"><div><p class="eyebrow">Продолжить знакомство</p><h2>Близкий опыт.</h2></div><a class="text-button" href="../projects.html">Всё портфолио '+arrow+'</a></div><div class="project-grid">'+''.join(g['card'](x,'../') for x in related)+'</div></section>'
     dialog = '<dialog class="lightbox" aria-label="Фотографии проекта"><div class="lightbox-toolbar"><span class="lightbox-counter"></span><button type="button" class="lightbox-close" aria-label="Закрыть фотографии">Закрыть ×</button></div><img class="lightbox-image" alt=""><div class="lightbox-nav"><button type="button" data-gallery-step="-1" aria-label="Предыдущая фотография">←</button><p>Листайте фото · ← → · Esc — закрыть</p><button type="button" data-gallery-step="1" aria-label="Следующая фотография">→</button></div></dialog>'
-    if p['id'] == 'museum':
+    if not p['images']:dialog = ''
+    if p['id'] == 'museum' and p['images']:
         return museum.enrich(g, p, body, dialog)
-    if p['id'] == 'burny' and p['images'][0] == 'burny':
+    if p['id'] == 'burny' and (p['images'] or [None])[0] == 'burny':
         body = body.replace('<section class="case-metrics">', '<p class="source-note section" style="padding-top:18px;padding-bottom:0">Фотография объекта: <a href="https://burny.ru/gallery" target="_blank" rel="noopener noreferrer">официальный сайт МФК «Бурный» ↗</a></p><section class="case-metrics">', 1)
     return body, dialog
 
