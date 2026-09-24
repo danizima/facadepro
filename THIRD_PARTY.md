@@ -1,0 +1,11 @@
+# Third-party components
+
+- Leaflet 1.9.4, BSD-2-Clause. Vendored from https://unpkg.com/leaflet@1.9.4/dist/ after verification against the SHA-256 in https://leafletjs.com/download.html. License: `site/vendor/leaflet/LICENSE`. Used only on the map (included in the offline preview bundle).
+- DejaVu Sans: `backend/fonts/`. License: `backend/fonts/LICENSE.txt`. Fonts are embedded in generated PDFs; no remote font requests.
+- OpenStreetMap basemap: fetched by the visitor's browser only after clicking “Показать карту улиц”. Tiles are not downloaded into the project or bundled offline. Visible attribution is kept on the map. Policy: https://operations.osmfoundation.org/policies/tiles/ . Browsers use standard Referer and HTTP caching. No prefetch, scraping, caching proxy or service worker.
+- Initial map positions are **settlement centres**, not building coordinates: Владивосток 43.1151, 131.8856; Новый (Надеждинский район) 43.3641, 132.0257. Coordinates cross-checked with https://elevation.maplogs.com/ru/vladivostok_primorsky_krai_russia.301812.html and https://geotree.ru/oktmo?title=посёлок+Новый+(Приморский+край,+Надеждинский+район,+поселение+Надеждинское,+05623402151). Project addresses come from the supplied portfolio. The interface labels city-level precision explicitly; update coordinates in the editor only when a building's exact location is verified.
+- PDF generation uses ReportLab and Pillow on the application server. The Dockerfile installs distribution packages. Local Python setup: `python3 -m pip install -r requirements.txt`.
+
+## Photographs added in 5.1
+
+WebP copies are bundled locally. Full provenance: `source/photo-sources.json`. BURNY: official project gallery, https://burny.ru/gallery. Museum: АО «СТГ-Восток» / NewsVL.ru (publication 2026-09-10), Ivan Dyakin / Primorsky regional government via PrimaMedia (2025-05-28), Primorsky regional government via PrimaMedia (2025-06-26). Source links and credits remain visible on the project pages. Publication dates are not asserted to be capture dates. User authorized use of these found images; no public commercial-use licence or separate rightsholder permission has been established. No watermark removal or generative alteration was performed. Original portfolio photographs remain in the undated gallery.

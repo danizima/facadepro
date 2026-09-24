@@ -1,0 +1,10 @@
+import {randomBytes} from 'node:crypto';
+import {db,passwordHash,audit} from '../backend/store.mjs';
+const username=process.argv[2]||'admin';
+if(!/^[a-zA-Z0-9_.-]{3,60}$/.test(username))throw Error('Имя: 3–60 латинских букв, цифр, точек или дефисов.');
+const exists=db.prepare('SELECT username FROM admins WHERE username=?').get(username);
+if(exists&&!process.argv.includes('--reset'))throw Error('Пользователь уже есть. Для сброса пароля явно добавьте --reset.');
+const password=randomBytes(24).toString('base64url');
+db.prepare('INSERT OR REPLACE INTO admins VALUES(?,?)').run(username,passwordHash(password));
+db.prepare('DELETE FROM sessions WHERE username=?').run(username);audit(username,exists?'password_reset':'admin_created');
+console.log('Панель: /admin/\nПользователь: '+username+'\nОдноразовая выдача пароля: '+password+'\nСохраните пароль в менеджере паролей.');db.close();

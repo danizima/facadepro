@@ -1,0 +1,13 @@
+.git
+node_modules
+data
+.env
+.env.*
+!.env.example
+.sites-runtime
+__pycache__
+**/__pycache__
+**/_qa*
+tmp
+*.zip
+*.sqlite*

@@ -1,0 +1,51 @@
+{
+  "updatedAt": "2026-09-24",
+  "authorization": "Пользователь поручил использовать найденные фотографии для сайта. Это не является документом о передаче авторских прав.",
+  "licenseStatus": "Публичная лицензия или отдельное разрешение правообладателей на коммерческое использование не подтверждены. Авторство и ссылки сохранены; условия размещения проверяются владельцем сайта перед публикацией.",
+  "datePolicy": "Период отчёта соответствует публикации. Точная дата съёмки не установлена. Общие строительные работы на внешних фото не приписываются ФАСАД.PRO.",
+  "photos": [
+    {
+      "asset": "burny.webp",
+      "page": "https://burny.ru/gallery",
+      "original": "https://burny.ru/assets/components/phpthumbof/cache/59.a85184ae282d4bcc8acd3d73c7124f01.jpg",
+      "credit": "Официальный сайт МФК «Бурный»",
+      "originalSize": [
+        1920,
+        1080
+      ]
+    },
+    {
+      "asset": "museum.webp",
+      "page": "https://www.newsvl.ru/vlad/2026/09/10/240301/",
+      "original": "https://static.vl.ru/news/1789002972298_default",
+      "credit": "АО «СТГ-Восток» / Новости VL.ru",
+      "publishedAt": "2026-09-10",
+      "originalSize": [
+        1200,
+        824
+      ]
+    },
+    {
+      "asset": "museum-2025-06.webp",
+      "page": "https://primamedia.ru/news/2130644/",
+      "original": "https://primamedia.ru/f/original/5417/5416578.jpg",
+      "credit": "Правительство Приморского края / PrimaMedia",
+      "publishedAt": "2025-06-26",
+      "originalSize": [
+        1024,
+        683
+      ]
+    },
+    {
+      "asset": "museum-2025-05.webp",
+      "page": "https://primamedia.ru/news/2095343/",
+      "original": "https://primamedia.ru/f/original/5335/5335000.jpg",
+      "credit": "Иван Дякин, Правительство Приморского края / PrimaMedia",
+      "publishedAt": "2025-05-28",
+      "originalSize": [
+        1024,
+        683
+      ]
+    }
+  ]
+}
