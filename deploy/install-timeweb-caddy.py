@@ -3,6 +3,8 @@
 
 Run as root on 193.124.47.248. No gateway restarts, DNS edits or volume deletion.
 The active Caddy configuration is checked, backed up and gracefully reloaded.
+If a stale single-file Docker bind mount is confirmed, Caddy alone is restarted
+once with the unchanged, validated configuration before installing the website.
 """
 import fcntl
 import ipaddress
@@ -137,6 +139,54 @@ def write_same_inode(path, contents, expected=None):
         os.fsync(stream.fileno())
 
 
+def file_identity(path):
+    info = path.stat()
+    return str(info.st_dev) + ':' + str(info.st_ino)
+
+
+def stale_file_binding(caddy, config, host_file, mounted_identity):
+    if mounted_identity == file_identity(host_file):
+        return False
+    # Only a confirmed single-file bind can be repaired by this installer.
+    check(any(m['Type'] == 'bind' and m['Destination'] == config and
+              Path(m['Source']) == host_file for m in caddy.get('Mounts', [])),
+          'Файлы на сервере и в контейнере различаются, но это не отдельный bind mount. '
+          'Требуется проверка конфигурации; перезапуск отменён.')
+    return True
+
+
+def refresh_file_binding(host_file, original, baseline, mounted_before,
+                         active_config, mounted_file, mounted_identity,
+                         restart_caddy, backup):
+    """Reopen a stale bind only while disk and running config are equivalent."""
+    check(host_file.read_text(encoding='utf-8') == original,
+          'Файл Caddy изменён параллельно; перезапуск отменён.')
+    check(mounted_file() == mounted_before and active_config() == baseline,
+          'Настройки Caddy изменены параллельно; перезапуск отменён.')
+    backup.mkdir(parents=True, mode=0o700)
+    (backup / 'Caddyfile.before').write_text(original)
+    (backup / 'Caddyfile.mounted.before').write_text(mounted_before)
+    (backup / 'config.before.json').write_text(json.dumps(baseline))
+    say('Подтверждено устаревшее подключение файла Docker. Резервная копия: ' + str(backup))
+    # Recheck after backing up. No configuration changes are made in this step.
+    check(host_file.read_text(encoding='utf-8') == original and active_config() == baseline,
+          'Настройки изменены во время резервного копирования; перезапуск отменён.')
+    say('Один раз перезапускаю Caddy с прежними проверенными настройками…')
+    restart_caddy()
+    for attempt in range(30):
+        try:
+            if (mounted_identity() == file_identity(host_file) and
+                    mounted_file() == original and active_config() == baseline):
+                say('Подключение файла восстановлено. Прежняя конфигурация Caddy работает.')
+                return
+        except (SetupError, ValueError, subprocess.TimeoutExpired):
+            pass
+        time.sleep(1)
+    raise SetupError('Перезапуск Caddy выполнен, но совпадение файла и активной конфигурации '
+                     'не подтверждено. Дальнейшая установка остановлена. '
+                     'Резервная копия: ' + str(backup))
+
+
 def connect_domain(host_file, original, candidate, baseline, proposed,
                    caddy_cmd, active_config, mounted_file, backup):
     """Apply one compiled JSON document, preserving the mounted Caddyfile."""
@@ -218,12 +268,27 @@ def main():
                    stdin=stdin, timeout=90)
 
     def active_config():
-        return json.loads(run('docker', 'exec', CADDY, 'wget', '-qO-',
-                              'http://127.0.0.1:2019/config/'))
+        return json.loads(run('docker', 'exec', CADDY, 'wget', '-qO-', '-T', '3',
+                              'http://127.0.0.1:2019/config/', timeout=10))
 
+    def mounted_file():
+        return run('docker', 'exec', CADDY, 'cat', config)
+
+    def mounted_identity():
+        return run('docker', 'exec', CADDY, 'stat', '-Lc', '%d:%i', config).strip()
+
+    mounted_before = mounted_file()
     baseline = json.loads(caddy_cmd('adapt', '--config', config, '--adapter', 'caddyfile'))
     check(active_config() == baseline,
           'Активные настройки Caddy отличаются от файла или изменены через API. Они сохранены.')
+    # A stale bind can hide different host settings. Never restart Caddy or
+    # append our site until the host copy also matches the running configuration.
+    host_baseline = json.loads(caddy_cmd('adapt', '--config', '-', '--adapter', 'caddyfile',
+                                        '--validate', stdin=original))
+    check(host_baseline == baseline,
+          'Настройки Caddy на диске отличаются от действующих. '
+          'Перезапуск и запись отменены; обе версии сохранены без изменений.')
+    needs_mount_refresh = stale_file_binding(caddy, config, host_file, mounted_identity())
     candidate = candidate_file(original, baseline)
     proposed = json.loads(caddy_cmd('adapt', '--config', '-', '--adapter', 'caddyfile',
                                     '--validate', stdin=candidate))
@@ -279,7 +344,17 @@ def main():
 
     say('Проверки пройдены. Caddy, шлюз Timeweb, DNS и свободный порт сайта проверены.')
     if sys.argv[1:] == ['--check']:
+        if needs_mount_refresh:
+            say('Обнаружено устаревшее подключение файла Docker; при установке Caddy будет перезапущен один раз.')
         return
+    if needs_mount_refresh:
+        STAGE = 'восстановление подключения файла Caddy'
+        mount_backup = Path('/root/facadepro-backups') / (time.strftime('%Y%m%d-%H%M%S') + '-mount')
+        refresh_file_binding(host_file, original, baseline, mounted_before,
+                             active_config, mounted_file, mounted_identity,
+                             lambda: run('docker', 'restart', '--timeout', '20', CADDY, timeout=90),
+                             mount_backup)
+        check(inspect(GATEWAY)['State']['Running'], 'Шлюз Timeweb не запущен. Дальнейшая установка остановлена.')
     STAGE = 'скачивание и сборка сайта'
     if not APP.exists():
         run('git', 'clone', '--branch', 'main', REPO, str(APP), live=True, timeout=300)
@@ -315,8 +390,7 @@ def main():
     if candidate != original:
         backup = Path('/root/facadepro-backups') / time.strftime('%Y%m%d-%H%M%S')
         connect_domain(host_file, original, candidate, baseline, proposed,
-                       caddy_cmd, active_config,
-                       lambda: run('docker', 'exec', CADDY, 'cat', config), backup)
+                       caddy_cmd, active_config, mounted_file, backup)
 
     STAGE = 'проверка HTTPS'
     say('Домен подключён. Ожидаю HTTPS-сертификат от Caddy…')
@@ -349,7 +423,7 @@ def main():
     else:
         say('Пользователи панели уже существуют. Их пароли сохранены.')
     say('ГОТОВО: https://facadepro.ru\nПанель: https://facadepro.ru/admin/')
-    say('Caddy и шлюз Timeweb не перезапускались. Данные сайта хранятся в постоянном Docker-томе.')
+    say('Данные сайта хранятся в постоянном Docker-томе.')
     say('Для почты заполните SMTP в /opt/facadepro/.env и выполните: cd /opt/facadepro && docker compose up -d')
 
 
