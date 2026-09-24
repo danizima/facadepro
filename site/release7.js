@@ -3,10 +3,8 @@
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const image=key=>key.startsWith('media/')?'/'+key:'/assets/'+key+'.webp';
  const download=async(ids,status)=>{status.textContent='Готовим PDF…';const r=await fetch('/api/portfolio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projects:ids,recipient:''}),signal:AbortSignal.timeout(65000)});if(!r.ok)throw Error((await r.json()).error||'Не удалось подготовить PDF.');const url=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=url;a.download='ФАСАД_PRO_проекты.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);status.textContent='PDF готов.';};
- const param=new URLSearchParams(location.search).get('compare');
  const callbackSection=document.querySelector('.callback-section');
  if(callbackSection&&'IntersectionObserver' in window)new IntersectionObserver(entries=>document.body.classList.toggle('callback-in-view',entries[0].isIntersecting),{threshold:0}).observe(callbackSection);
- if(param&&document.querySelector('#request-form')&&/^[a-z0-9,-]{2,185}$/.test(param))fetch('/api/public/projects').then(r=>r.json()).then(data=>{const ids=[...new Set(param.split(','))].filter(id=>data.projects.some(p=>p.id===id));if(!ids.length||ids.length>3)return;const f=document.querySelector('#request-form'),input=document.createElement('input');input.type='hidden';input.name='comparedProjects';input.value=ids.join(',');f.append(input);const p=document.createElement('p');p.className='selection-context';p.textContent='Обращение по сравнению: '+ids.map(id=>data.projects.find(p=>p.id===id).title).join(', ');f.prepend(p);}).catch(()=>{});
  document.querySelectorAll('.callback-form').forEach(form=>{
   const status=form.querySelector('.callback-status'),button=form.querySelector('[type=submit]');let key=window.facade.uuid(),busy=false;
   form.addEventListener('input',()=>{if(!busy)key=window.facade.uuid();});

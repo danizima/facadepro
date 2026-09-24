@@ -14,20 +14,23 @@ document.addEventListener('pointerdown',event=>{if(navigation.classList.contains
 if($('#project-search')){
  const search=$('#project-search'),cards=$$('.catalog-grid .project-card'),filters=$$('[data-filter]');
  const params=new URLSearchParams(window.facadeQuery??location.search);
+ const service=$('#catalog-service'),city=$('#catalog-city');
+ for(const [select,name] of [[service,'service'],[city,'city']])if(select&&[...select.options].some(o=>o.value===params.get(name)))select.value=params.get(name);
  let category=filters.some(b=>b.dataset.filter===params.get('type'))?params.get('type'):'all';
  search.value=params.get('q')||'';
  const normalize=s=>s.toLocaleLowerCase('ru').replaceAll('ё','е').trim();
  function filter(updateURL=true){
   const query=normalize(search.value);let count=0;
-  cards.forEach(card=>{const show=(category==='all'||card.dataset.category===category)&&normalize(card.dataset.search).includes(query);card.hidden=!show;if(show){card.dataset.slot=String(count%4);count++;}});
+  cards.forEach(card=>{const show=(category==='all'||card.dataset.category===category)&&normalize(card.dataset.search).includes(query)&&(!service?.value||(card.dataset.services||'').split(' ').includes(service.value))&&(!city?.value||card.dataset.city===city.value);card.hidden=!show;if(show){card.dataset.slot=String(count%4);count++;}});
   filters.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.filter===category)));
   $('#results-count').textContent=`Показано проектов: ${count} из ${cards.length}`;
-  $('#empty-results').hidden=count>0;$('#reset-filters').hidden=category==='all'&&!query;
-  if(updateURL){const next=new URLSearchParams();if(category!=='all')next.set('type',category);if(search.value.trim())next.set('q',search.value.trim());try{if(window.facadeUpdateSearch)window.facadeUpdateSearch(next.toString());else history.replaceState(null,'',location.pathname+(next.size?'?'+next:'')+location.hash);}catch{/* Local previews may not expose a writable URL. */}}
+  $('#empty-results').hidden=count>0;$('#reset-filters').hidden=category==='all'&&!query&&!service?.value&&!city?.value;
+  if(updateURL){const next=new URLSearchParams(window.facadeQuery??location.search);for(const key of ['type','q','service','city'])next.delete(key);if(service?.value)next.set('service',service.value);if(city?.value)next.set('city',city.value);if(category!=='all')next.set('type',category);if(search.value.trim())next.set('q',search.value.trim());try{if(window.facadeUpdateSearch)window.facadeUpdateSearch(next.toString());else history.replaceState(null,'',location.pathname+(next.size?'?'+next:'')+location.hash);}catch{/* Local previews may not expose a writable URL. */}}
  }
  filters.forEach(b=>b.addEventListener('click',()=>{category=b.dataset.filter;filter();}));
  search.addEventListener('input',()=>filter());
- const reset=()=>{category='all';search.value='';filter();search.focus();};
+ service?.addEventListener('change',()=>filter());city?.addEventListener('change',()=>filter());
+ const reset=()=>{category='all';search.value='';if(service)service.value='';if(city)city.value='';filter();search.focus();};
  $('#reset-filters').addEventListener('click',reset);$('[data-reset-filters]').addEventListener('click',reset);filter(false);
 }
 // Project photography: thumbnails and a keyboard-accessible native dialog.
