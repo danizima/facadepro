@@ -34,6 +34,17 @@ class SetupError(Exception):
     pass
 
 
+class CommandError(SetupError):
+    def __init__(self, args, result):
+        label = ' '.join(args[:6])
+        if len(args) > 7 and args[:2] == ('docker', 'exec') and args[6] == 'caddy':
+            label = 'Caddy: ' + ' '.join(args[7:])
+        super().__init__('Не выполнена команда: ' + label +
+                         ' (код ' + str(result.returncode) + ').')
+        # Kept for a root-only diagnostic file, never printed to the console.
+        self.stderr = result.stderr or ''
+
+
 def check(condition, message):
     if not condition:
         raise SetupError(message)
@@ -49,7 +60,7 @@ def run(*args, stdin=None, live=False, timeout=60):
     if result.returncode:
         # Captured Caddy JSON and container metadata can include secrets.
         # Never dump those contents into console diagnostics.
-        raise SetupError('Не выполнена команда: ' + ' '.join(args[:6]))
+        raise CommandError(args, result)
     return result.stdout or ''
 
 
@@ -124,6 +135,60 @@ def write_same_inode(path, contents, expected=None):
         stream.truncate()
         stream.flush()
         os.fsync(stream.fileno())
+
+
+def connect_domain(host_file, original, candidate, baseline, proposed,
+                   caddy_cmd, active_config, mounted_file, backup):
+    """Apply one compiled JSON document, preserving the mounted Caddyfile."""
+    check(active_config() == baseline,
+          'Настройки Caddy изменились во время сборки. Запись отменена.')
+    backup.mkdir(parents=True, mode=0o700)
+    (backup / 'Caddyfile.before').write_text(original)
+    (backup / 'config.before.json').write_text(json.dumps(baseline))
+    say('Резервная копия конфигурации: ' + str(backup))
+    write_same_inode(host_file, candidate, expected=original)
+    phase = 'проверка файла внутри контейнера'
+    try:
+        # Compare the actual mounted bytes, not two independently adapted JSON
+        # documents. Reload exactly the native JSON validated in preflight.
+        check(mounted_file() == candidate,
+              'Файл внутри контейнера отличается от записанного Caddyfile.')
+        phase = 'проверка настроек перед применением'
+        check(active_config() == baseline,
+              'Активная конфигурация изменена параллельно.')
+        phase = 'применение проверенной конфигурации'
+        caddy_cmd('reload', '--config', '-', stdin=json.dumps(proposed))
+        phase = 'подтверждение активной конфигурации'
+        check(active_config() == proposed,
+              'Активная конфигурация не совпала с переданной в Caddy.')
+    except Exception as error:
+        diagnostic = backup / 'failure.txt'
+        # Caddy diagnostics may contain gateway secrets. Keep them on the
+        # server under /root; the console reports only the phase and command.
+        try:
+            diagnostic.write_text(phase + '\n' + str(error) + '\n' +
+                                  getattr(error, 'stderr', ''))
+            diagnostic.chmod(0o600)
+            details = '\nПодробности сохранены на сервере: ' + str(diagnostic)
+        except OSError:
+            # A full disk must not prevent an otherwise possible rollback.
+            details = '\nНе удалось сохранить дополнительный журнал.'
+        try:
+            current = active_config()
+            check(current in (baseline, proposed),
+                  'Активные настройки изменены параллельно; автоматический откат отменён.')
+            write_same_inode(host_file, original, expected=candidate)
+            if current != baseline:
+                caddy_cmd('reload', '--config', '-', stdin=json.dumps(baseline))
+            check(active_config() == baseline,
+                  'Caddy не подтвердил восстановление прежних настроек.')
+        except Exception as rollback_error:
+            raise SetupError('Причина (' + phase + '): ' + str(error) +
+                             '\nОткат не подтверждён: ' + str(rollback_error) +
+                             '\nРезервная копия: ' + str(backup)) from error
+        raise SetupError('Причина (' + phase + '): ' + str(error) +
+                         '\nПрежняя конфигурация восстановлена.' +
+                         details) from error
 
 
 def main():
@@ -249,25 +314,9 @@ def main():
     check(active_config() == baseline, 'Настройки Caddy изменились во время сборки. Запись отменена.')
     if candidate != original:
         backup = Path('/root/facadepro-backups') / time.strftime('%Y%m%d-%H%M%S')
-        backup.mkdir(parents=True, mode=0o700)
-        (backup / 'Caddyfile.before').write_text(original)
-        (backup / 'config.before.json').write_text(json.dumps(baseline))
-        say('Резервная копия конфигурации: ' + str(backup))
-        write_same_inode(host_file, candidate, expected=original)
-        try:
-            # Read through the existing Docker bind mount before the reload.
-            mounted = json.loads(caddy_cmd('adapt', '--config', config, '--adapter', 'caddyfile', '--validate'))
-            check(mounted == proposed, 'Caddy не видит новую конфигурацию.')
-            caddy_cmd('reload', '--config', config, '--adapter', 'caddyfile')
-            check(active_config() == proposed, 'Caddy не подтвердил новую конфигурацию.')
-        except Exception:
-            # Restore only if nobody edited the file/config after this installer.
-            current = active_config()
-            check(current in (baseline, proposed),
-                  'Параллельно изменены настройки Caddy. Сохранена резервная копия, автоматический откат отменён.')
-            write_same_inode(host_file, original, expected=candidate)
-            caddy_cmd('reload', '--config', config, '--adapter', 'caddyfile')
-            raise SetupError('Новая конфигурация не принята. Прежняя конфигурация восстановлена.')
+        connect_domain(host_file, original, candidate, baseline, proposed,
+                       caddy_cmd, active_config,
+                       lambda: run('docker', 'exec', CADDY, 'cat', config), backup)
 
     STAGE = 'проверка HTTPS'
     say('Домен подключён. Ожидаю HTTPS-сертификат от Caddy…')
