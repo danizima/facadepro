@@ -173,8 +173,8 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
    try{
     let html=await readFile(path.join(dir,'public','projects',project.id+'.html'),'utf8');
     // Draft previews can require a script combination absent from published pages.
-    const css=['styles','enhancements','business','release4','visual5','museum','release6','release7','release8','release9'];
-    const js=['app','public','request','release4','visual5','museum','release6','release7','release8','release9'];
+    const css=['styles','enhancements','business','release4','visual5','museum','release6','release7','release8','release9','visual10'];
+    const js=['app','public','request','release4','visual5','museum','release6','release7','release8','release9','visual10'];
     html=html.replace(/<link rel="stylesheet" href="[^"]*bundles\/site-[a-f0-9]+\.css">/,css.map(n=>'<link rel="stylesheet" href="/'+n+'.css">').join(''));
     html=html.replace(/<script src="[^"]*bundles\/page-[a-f0-9]+\.js" defer><\/script>/,js.map(n=>'<script src="/'+n+'.js" defer></script>').join(''));
     json(res,200,{html:html.replace('<head>','<head><base href="'+origin(req)+'/projects/">')});

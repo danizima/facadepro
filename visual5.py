@@ -2,6 +2,7 @@
 import json
 import re
 import museum
+import visual10
 
 SERVICE_VISUALS = {
     'glazing': ('museum', 'museum-facade', 'Остеклить фасад', 'Свет, геометрия и масштаб.'),
@@ -24,27 +25,7 @@ def image_for_service(g, service):
 
 
 def hero(g):
-    e, img, arrow = g['e'], g['img'], g['ARROW']
-    projects = [g['PBY'][key] for key in ['museum', 'restaurant', 'burny'] if key in g['PBY']]
-    projects = (projects + [p for p in g['P'] if p not in projects])[:3]
-    if not projects:
-        return '<section class="empty-hero section"><h1>'+e(g['CFG']['slogan'])+'</h1>'+g['button']('Обсудить объект', 'request.html', True)+'</section>'
-    slides, tabs = [], []
-    for i, p in enumerate(projects):
-        slides.append(f'''<div class="architecture-slide" id="hero-panel-{i}" role="tabpanel" aria-labelledby="hero-tab-{i}" {"hidden" if i else ""}>
-          {img(p['images'][0], p['title'], eager=i == 0, sizes='100vw')}
-          <a href="projects/{p['id']}.html" class="architecture-caption"><span class="eyebrow">{'Наш крупнейший проект' if p['id'] == 'museum' else p['type']}</span><strong>{p['title']}</strong><span class="architecture-caption-bottom"><span>{p['volume']}</span>{arrow}</span></a>
-        </div>''')
-        tabs.append(f'<button type="button" role="tab" data-hero-tab="{i}" id="hero-tab-{i}" aria-controls="hero-panel-{i}" aria-selected="{str(i == 0).lower()}" tabindex="{0 if i == 0 else -1}"><span>0{i + 1}</span><span>{p["title"]}</span></button>')
-    slogan = e(g['CFG']['slogan']).replace(' любой ', '<br>любой<br>')
-    return f'''<section class="architecture-hero" aria-label="Ключевые проекты">
-      <div class="architecture-stage">{''.join(slides)}</div>
-      <div class="architecture-copy"><p class="eyebrow">Остекление · Монтаж · Восстановление</p><h1>{slogan}</h1><p class="architecture-lead">От точного узла<br>до выразительной архитектуры.</p>
-        <div class="architecture-actions">{g['button']('Смотреть проекты', 'projects.html', True)}<a class="text-button" href="request.html">Обсудить объект {arrow}</a></div>
-        <div class="architecture-note"><span class="availability-dot" aria-hidden="true"></span>Москва · Владивосток · Вся Россия</div>
-      </div>
-      <div class="architecture-bottom"><div class="architecture-tabs" role="tablist" aria-label="Ключевые объекты">{''.join(tabs)}</div><div class="architecture-controls"><button type="button" data-hero-prev aria-label="Предыдущий проект">←</button><span class="architecture-count" aria-live="polite">01 / {len(projects):02}</span><button type="button" data-hero-next aria-label="Следующий проект">→</button></div></div>
-    </section>'''
+    return visual10.hero(g)
 
 
 def service_cards(g, base=''):
@@ -134,7 +115,7 @@ def project(g, p, index):
 
 
 def mobile_actions(g, base, path):
-    if path in ['request.html','quote.html','portfolio.html']:
+    if path in ['request.html','quote.html','portfolio.html','kit.html','updates.html']:
         return ''
     phone = re.sub(r'[^+0-9]', '', g['CFG']['phone'])
     return f'<nav class="mobile-actions" aria-label="Быстрая связь"><a href="tel:{phone}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m7 3 3 5-2 2c1.5 3 3 4.5 6 6l2-2 5 3-1 4C11 22 2 13 3 4Z"/></svg>Позвонить</a><a href="{base}request.html">Обсудить объект {g["ARROW"]}</a></nav>'

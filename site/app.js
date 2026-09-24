@@ -3,10 +3,10 @@ const $=(selector,root=document)=>root.querySelector(selector);
 const $$=(selector,root=document)=>Array.from(root.querySelectorAll(selector));
 const menuButton=$('.menu-toggle');
 const navigation=$('.navigation');
-function closeMenu(){navigation.classList.remove('open');menuButton.setAttribute('aria-expanded','false');menuButton.setAttribute('aria-label','Открыть меню');document.body.classList.remove('menu-open');for(const el of document.querySelectorAll('main,.site-footer'))el.inert=false;}
-menuButton.addEventListener('click',()=>{const open=menuButton.getAttribute('aria-expanded')!=='true';menuButton.setAttribute('aria-expanded',String(open));menuButton.setAttribute('aria-label',open?'Закрыть меню':'Открыть меню');navigation.classList.toggle('open',open);document.body.classList.toggle('menu-open',open);for(const el of document.querySelectorAll('main,.site-footer'))el.inert=open;});
+function closeMenu(){navigation.classList.remove('open');menuButton.setAttribute('aria-expanded','false');menuButton.setAttribute('aria-label','Открыть меню');document.body.classList.remove('menu-open');for(const el of document.querySelectorAll('main,.site-footer,.consent-banner,.mobile-actions'))el.inert=false;}
+menuButton.addEventListener('click',()=>{const open=menuButton.getAttribute('aria-expanded')!=='true';menuButton.setAttribute('aria-expanded',String(open));menuButton.setAttribute('aria-label',open?'Закрыть меню':'Открыть меню');navigation.classList.toggle('open',open);document.body.classList.toggle('menu-open',open);for(const el of document.querySelectorAll('main,.site-footer,.consent-banner,.mobile-actions'))el.inert=open;if(open)navigation.querySelector('.nav-primary a')?.focus({preventScroll:true});});
 $$('a',navigation).forEach(a=>a.addEventListener('click',closeMenu));
-matchMedia('(min-width:801px)').addEventListener('change',event=>{if(event.matches)closeMenu();});
+matchMedia('(min-width:1101px)').addEventListener('change',event=>{if(event.matches)closeMenu();});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&navigation.classList.contains('open')){closeMenu();menuButton.focus();}});
 document.addEventListener('keydown',event=>{if(event.key!=='Tab'||!navigation.classList.contains('open'))return;const items=$$('a,button',$('.header')).filter(el=>el.getClientRects().length&&!el.disabled);const first=items[0],last=items[items.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}});
 document.addEventListener('pointerdown',event=>{if(navigation.classList.contains('open')&&!event.target.closest('.header'))closeMenu();});
@@ -38,7 +38,7 @@ if($('.project-gallery')){
  const gallery=$('.project-gallery'),keys=JSON.parse(gallery.dataset.gallery),dialog=$('.lightbox');
  const stage=$('.gallery-stage>img'),large=$('.lightbox-image'),thumbs=$$('[data-image]');let index=0,opener=$('.gallery-zoom');
  const asset=key=>window.facadeAsset?window.facadeAsset(key):document.body.dataset.base+(key.startsWith('media/')?key:'assets/'+key+'.webp');
- function display(next){index=(next+keys.length)%keys.length;stage.src=asset(keys[index]);large.src=stage.src;stage.alt=large.alt=gallery.dataset.title+`. Фотография ${index+1}`;$('.gallery-position').textContent=$('.lightbox-counter').textContent=`${index+1} / ${keys.length}`;thumbs.forEach((b,i)=>b.setAttribute('aria-pressed',String(i===index)));}
+ function display(next){index=(next+keys.length)%keys.length;stage.removeAttribute('srcset');stage.removeAttribute('sizes');stage.src=asset(keys[index]);large.src=stage.src;stage.alt=large.alt=gallery.dataset.title+`. Фотография ${index+1}`;$('.gallery-position').textContent=$('.lightbox-counter').textContent=`${index+1} / ${keys.length}`;thumbs.forEach((b,i)=>b.setAttribute('aria-pressed',String(i===index)));}
  thumbs.forEach(b=>b.addEventListener('click',()=>display(Number(b.dataset.image))));
  $$('[data-gallery-step]').forEach(b=>{b.hidden=keys.length<2;b.addEventListener('click',()=>display(index+Number(b.dataset.galleryStep)));});
  function openPhoto(next,trigger){opener=trigger;closeMenu();display(next);dialog.showModal();document.body.classList.add('modal-open');}

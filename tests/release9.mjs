@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {spawn,spawnSync} from 'node:child_process';
-import {mkdtemp,rm,mkdir,writeFile} from 'node:fs/promises';
+import {mkdtemp,rm,mkdir,writeFile,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 const root=new URL('../',import.meta.url).pathname,temp=await mkdtemp(path.join(tmpdir(),'facadepro-v9-')),base='http://127.0.0.1:18748';
@@ -9,12 +9,13 @@ const admin=spawnSync(process.execPath,['scripts/create-admin.mjs','tester9'],{c
 const password=admin.stdout.match(/Одноразовая выдача пароля: (.+)/)[1];
 const server=spawn(process.execPath,['server.mjs'],{cwd:root,env,stdio:['ignore','ignore','pipe']});let log='',cookie='',csrf='';server.stderr.on('data',b=>log+=b);
 async function call(route,body,auth=false,method=body?'POST':'GET'){return fetch(base+route,{method,headers:{Origin:base,...(auth?{Cookie:cookie,'X-CSRF-Token':csrf}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});}
+const version=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8')).version;
 const kit=(projects=[],documents=[],profile=true)=>({profile,projects,documents});
 try{
  for(let i=0;i<150;i++){try{if((await fetch(base+'/healthz')).ok)break;}catch{}if(i===149)throw Error(log);await new Promise(r=>setTimeout(r,100));}
- assert.equal((await(await call('/healthz')).json()).version,'9.0.0');
+ assert.equal((await(await call('/healthz')).json()).version,version);
  const login=await call('/api/admin/login',{username:'tester9',password});assert.equal(login.status,200);cookie=login.headers.get('set-cookie').split(';')[0];csrf=(await login.json()).csrf;
- const home=await(await call('/')).text();assert.match(home,/class="site-version"[^>]+updates.html">Версия 9.0.0/);
+ const home=await(await call('/')).text();assert.ok(home.includes('updates.html">Версия '+version));
  assert.equal([...home.matchAll(/<script src=/g)].length,1);assert.equal([...home.matchAll(/<link rel="stylesheet"/g)].length,1);
  const bundle=home.match(/href="(bundles\/site-[a-f0-9]+\.css)"/)[1];
  const plain=await fetch(base+'/'+bundle,{headers:{'Accept-Encoding':'identity'}}),gzip=await fetch(base+'/'+bundle,{headers:{'Accept-Encoding':'gzip'}});
@@ -28,7 +29,7 @@ try{
  for(const input of [kit([],[],false),kit(['missing']),kit(['museum','museum']),kit([],['../uploads/x']),{...kit(),profile:'true'}])assert.equal((await call('/api/contractor-kit',input)).status,422);
  const response=await call('/api/contractor-kit',kit(['museum','restaurant']));assert.equal(response.status,200,await response.clone().text());assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('content-type'),'application/zip');
  const zip=Buffer.from(await response.arrayBuffer()),out=path.join(root,'artifacts/pdf-v9');await mkdir(out,{recursive:true});await writeFile(path.join(out,'contractor-kit.zip'),zip);
- const extracted=spawnSync('python3',['-c',`from zipfile import ZipFile\nimport sys\nz=ZipFile(sys.argv[1]);assert set(z.namelist())=={'01_Карточка_компании.pdf','02_Портфолио.pdf','Состав_пакета.txt'};z.extractall(sys.argv[2]);assert '9.0.0' in z.read('Состав_пакета.txt').decode('utf-8-sig')`,path.join(out,'contractor-kit.zip'),out],{encoding:'utf8'});assert.equal(extracted.status,0,extracted.stderr);
+ const extracted=spawnSync('python3',['-c',`from zipfile import ZipFile\nimport sys\nz=ZipFile(sys.argv[1]);assert set(z.namelist())=={'01_Карточка_компании.pdf','02_Портфолио.pdf','Состав_пакета.txt'};z.extractall(sys.argv[2]);assert '${version}' in z.read('Состав_пакета.txt').decode('utf-8-sig')`,path.join(out,'contractor-kit.zip'),out],{encoding:'utf8'});assert.equal(extracted.status,0,extracted.stderr);
  let c=await(await call('/api/admin/content',undefined,true)).json();
  const uploadBody=new FormData();uploadBody.append('files',new Blob([Buffer.from('%PDF-1.4\nQA public document\n%%EOF')]),'qa.pdf');
  const uploaded=await fetch(base+'/api/admin/materials/upload',{method:'POST',headers:{Origin:base,Cookie:cookie,'X-CSRF-Token':csrf},body:uploadBody});assert.equal(uploaded.status,201);const file=await uploaded.json();

@@ -31,7 +31,7 @@
   }
 
   // Progressive enhancement: everything stays visible without JavaScript.
-  if ('IntersectionObserver' in window && !motion.matches) {
+  if ('IntersectionObserver' in window && !motion.matches && !matchMedia('(max-width:800px)').matches) {
     const observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
         if (!entry.isIntersecting) return;
@@ -66,6 +66,8 @@
     all('[data-compare-image]').forEach(button => button.addEventListener('click', () => {
       all('[data-compare-image]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
       label.textContent = button.textContent;
+      before.removeAttribute('srcset');
+      before.removeAttribute('sizes');
       before.src = asset(button.dataset.compareImage);
       before.alt = button.textContent + ' здания ресторана';
       update(range.value);

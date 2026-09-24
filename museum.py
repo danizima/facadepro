@@ -1,5 +1,6 @@
 """Flagship case study and dated, attributed construction photo journal."""
 import json
+import re
 import release6
 from pathlib import Path
 
@@ -30,6 +31,7 @@ def enrich(g, p, body, dialog):
     gallery_end = body.index('</section>', start) + len('</section>')
     gallery = body[start:gallery_end].replace('<section ', '<section id="project-gallery" ', 1)
     gallery = gallery.replace('assets/museum.webp', 'assets/museum-portfolio.webp').replace('&quot;museum&quot;', '&quot;museum-portfolio&quot;')
+    gallery = re.sub(r' srcset="[^"]*assets/museum-small\.webp[^"]*"', '', gallery)
     gallery = gallery.replace('Фотографии объекта', 'Общая галерея объекта', 1)
     tail = body[gallery_end:]
     details_start = tail.find('<section class="case-photo-essay')

@@ -1,7 +1,7 @@
 """Generate the static site from portfolio data. Python 3, standard library only."""
 from pathlib import Path
 import json, re, html, urllib.parse, os
-import release4, visual5, release6, release7, release8, release9, assets9
+import release4, visual5, release6, release7, release8, release9, assets9, visual10
 ROOT=Path(__file__).resolve().parent
 VERSION=json.loads((ROOT/'package.json').read_text())['version']
 OUT=Path(os.environ.get('FACADE_OUTPUT',str(ROOT/'site')))
@@ -24,27 +24,26 @@ ARROW='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="
 CATEGORIES={'Культурная инфраструктура':'culture','Гостиничные комплексы':'hotels','Жилые комплексы':'housing','Строительство':'construction'}
 PBY={p['id']:p for p in P}
 pages=[]
-def img(key,alt,base='',eager=False,sizes=None):
+def img(key,alt,base='',eager=False,sizes=None,full=False):
  url=base+key if key.startswith("media/") else base+"assets/"+key+".webp"
  width,height=IMAGE_SIZES.get(key,[1200,900])
  priority=' fetchpriority="high"' if eager else ''
  responsive=''
  sizes=e(sizes or '(max-width: 600px) 100vw, (max-width: 1000px) 65vw, 50vw') if sizes or not eager else None
  small_width=IMAGE_SIZES.get(key+'-small',[520])[0]
- if not key.startswith('media/') and (ROOT/'site/assets'/f'{key}-small.webp').is_file() and IMAGE_SIZES.get(key+'-small',[520])[0]<width:
+ if not full and not key.startswith('media/') and (ROOT/'site/assets'/f'{key}-small.webp').is_file() and IMAGE_SIZES.get(key+'-small',[520])[0]<width:
   responsive=f' srcset="{base}assets/{key}-small.webp {small_width}w, {url} {width}w" sizes="{sizes}"' if not eager or sizes else ''
  return f'<img{responsive} src="{url}" alt="{e(alt)}" width="{width}" height="{height}" loading="{"eager" if eager else "lazy"}" decoding="async"{priority}>' 
 def button(label,href,light=False):
  return f'<a class="button {"button-light" if light else ""}" href="{href}">{label}{ARROW}</a>'
 def header(base,active):
- nav=''.join(f'<a href="{base}{url}.html"'+(' aria-current="page"' if active==url else '')+f'>{label}</a>' for url,label in [('projects','Проекты'),('services','Услуги'),('about','Компания'),('contractors','Генподрядчикам'),('contacts','Контакты')])
- nav+=f'<a class="nav-request" href="{base}request.html">Обсудить проект ↗</a>'
- return f'<a class="skip-link" href="#main">Перейти к содержанию</a><header class="header"><div class="header-inner"><a href="{base}index.html" class="brand" aria-label="ФАСАД.PRO — на главную"><img src="{base}assets/logo.svg" alt="ФАСАД.PRO" width="180" height="49"></a><nav class="navigation" id="navigation" aria-label="Основная навигация">{nav}</nav><a class="header-contact" href="{base}request.html">Обсудить проект {ARROW}</a><button class="menu-toggle" aria-expanded="false" aria-controls="navigation" aria-label="Открыть меню"><span></span><span></span></button></div></header>'
+ return visual10.header(globals(),base,active)
 def footer(base=''):
  return f'''<footer class="site-footer"><div class="footer-top"><div><p class="eyebrow">Новый объект начинается с разговора</p><h2>Обсудим ваш<br>проект.</h2>{button('Подготовить заявку',base+'request.html',True)}</div><div class="footer-contact"><span class="contact-label">Ваш менеджер</span><p>{e(CFG["manager"])}</p><a class="phone" href="tel:{re.sub(r"[^+0-9]","",CFG["phone"])}">{e(CFG["phone"])}</a><a class="contact-email" href="mailto:{e(CFG["email"])}">{e(CFG["email"])} {ARROW}</a><a class="text-button" href="{base}index.html#callback">Попросить перезвонить ↗</a><a class="text-button" href="{base}contacts.html">Адреса и реквизиты {ARROW}</a></div></div><div class="footer-bottom"><a class="footer-brand" href="{base}index.html" aria-label="На главную"><img src="{base}assets/logo.svg" width="160" height="44" alt="ФАСАД.PRO"></a><span>© 2026 ФАСАД.PRO</span><span>Москва · Владивосток · Вся Россия</span><a href="{base}map.html">Карта проектов</a><a href="{base}portfolio.html">Собрать PDF</a><a href="{base}compare.html">Сравнить проекты</a><a href="{base}solutions.html">Подбор решения</a><a href="{base}privacy.html">Обработка данных</a><button class="text-button analytics-settings" type="button">Статистика</button><a href="#main">Наверх ↑</a></div><a class="site-version" href="{base}updates.html">Версия {VERSION} · Что нового</a></footer>'''
 def page(path,title,desc,body,active='',extra=''):
  body=release9.enhance(globals(),path,body)
  body=release8.enhance(globals(),path,body)
+ body=visual10.enhance(globals(),path,body)
  if path in ['index.html','about.html']: body+=release7.materials(globals())
  if path in ['index.html','contacts.html']:body+=release7.callback(globals())
  if path.startswith('projects/') and path.endswith('.html'):body+=release7.materials(globals(),path.split('/')[-1][:-5])
@@ -54,7 +53,7 @@ def page(path,title,desc,body,active='',extra=''):
  if path in ['projects.html','map.html','portfolio.html','compare.html']:
   body='<nav class="project-subnav" aria-label="Портфолио">'+''.join(f'<a href="{u}"'+(' aria-current="page"' if path==u else '')+f'>{t}</a>' for u,t in [('projects.html','Каталог'),('map.html','Карта проектов'),('portfolio.html','Собрать PDF'),('compare.html','Сравнить')])+'</nav>'+body
  seo={'@context':'https://schema.org','@type':'Organization','name':'ФАСАД.PRO','legalName':CFG['legalName'],'url':'https://facadepro.ru/','telephone':CFG['phone'],'email':CFG['email']}
- content=f'''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#232729"><title>{e(title)} — ФАСАД.PRO</title><meta name="description" content="{e(desc)}"><link rel="canonical" href="{url}"><meta property="og:type" content="website"><meta property="og:locale" content="ru_RU"><meta property="og:title" content="{e(title)} — ФАСАД.PRO"><meta property="og:description" content="{e(desc)}"><meta property="og:url" content="{url}"><meta property="og:image" content="https://facadepro.ru/assets/museum.webp"><link rel="icon" href="{base}favicon.svg" type="image/svg+xml">{map_assets}<script type="application/ld+json">{json.dumps(seo,ensure_ascii=False).replace(chr(60),chr(92)+'u003c')}</script>{assets9.assets(globals(),path,body+extra,base)}</head><body data-base="{base}">{header(base,active)}<main id="main">{body}</main>{footer(base)}{visual5.mobile_actions(globals(),base,path)}{extra}<noscript><style>.js-only{{display:none!important}}.menu-toggle{{display:none}}@media(max-width:800px){{.navigation{{display:flex!important;position:static;flex-wrap:wrap;background:transparent;padding:16px 0}}.header-inner{{flex-wrap:wrap}}.navigation a{{font-size:16px;padding:8px}}}}</style></noscript></body></html>'''
+ content=f'''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#232729"><title>{e(title)} — ФАСАД.PRO</title><meta name="description" content="{e(desc)}"><link rel="canonical" href="{url}"><meta property="og:type" content="website"><meta property="og:locale" content="ru_RU"><meta property="og:title" content="{e(title)} — ФАСАД.PRO"><meta property="og:description" content="{e(desc)}"><meta property="og:url" content="{url}"><meta property="og:image" content="https://facadepro.ru/assets/museum.webp"><link rel="icon" href="{base}favicon.svg" type="image/svg+xml">{map_assets}<script type="application/ld+json">{json.dumps(seo,ensure_ascii=False).replace(chr(60),chr(92)+'u003c')}</script>{assets9.assets(globals(),path,body+extra,base)}</head><body data-base="{base}">{header(base,active)}<main id="main">{body}</main>{footer(base)}{visual5.mobile_actions(globals(),base,path)}{extra}<noscript><style>.js-only{{display:none!important}}.menu-toggle{{display:none}}@media(max-width:1100px){{.navigation{{display:flex!important;position:static;flex-wrap:wrap;background:transparent;padding:16px 0;height:auto!important;max-height:none!important}}.header-inner{{flex-wrap:wrap}}.nav-extras{{display:none!important}}.nav-primary{{display:flex;flex-wrap:wrap;gap:0 16px}}.navigation a{{font-size:16px;padding:8px}}}}</style></noscript></body></html>'''
  if path=='contacts.html':
   for oldv,newv in [('Надежда Лизогубова',CFG['manager']),('ООО «Мастер Склад Владивосток»',CFG['legalName']),('2543104214',CFG['inn']),('254301001',CFG['kpp'])]:
    content=content.replace(oldv,e(newv))
