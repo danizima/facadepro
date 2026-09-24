@@ -32,7 +32,7 @@ def hero(g):
     slides, tabs = [], []
     for i, p in enumerate(projects):
         slides.append(f'''<div class="architecture-slide" id="hero-panel-{i}" role="tabpanel" aria-labelledby="hero-tab-{i}" {"hidden" if i else ""}>
-          {img(p['images'][0], p['title'], eager=i == 0)}
+          {img(p['images'][0], p['title'], eager=i == 0, sizes='100vw')}
           <a href="projects/{p['id']}.html" class="architecture-caption"><span class="eyebrow">{'Наш крупнейший проект' if p['id'] == 'museum' else p['type']}</span><strong>{p['title']}</strong><span class="architecture-caption-bottom"><span>{p['volume']}</span>{arrow}</span></a>
         </div>''')
         tabs.append(f'<button type="button" role="tab" data-hero-tab="{i}" id="hero-tab-{i}" aria-controls="hero-panel-{i}" aria-selected="{str(i == 0).lower()}" tabindex="{0 if i == 0 else -1}"><span>0{i + 1}</span><span>{p["title"]}</span></button>')

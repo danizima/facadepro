@@ -10,6 +10,8 @@ import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import path from 'node:path';
 import {ROOT,DATA,db,content,hash,passwordValid,passwordHash,rate,audit,transaction,cleanSession,fail,text,emailOK,validateContent,SERVICE_IDS,STATUSES} from './backend/store.mjs';
 import {createPortfolio} from './backend/portfolio.mjs';
+import {selectKit,createKit,kitDocuments} from './backend/kit.mjs';
+import {servePublicFile} from './backend/public-files.mjs';
 import {listLeads,updateFollowup,reminders,todayParam,staff} from './backend/followups.mjs';
 const solutionCatalog=JSON.parse(await readFile(path.join(ROOT,'source/solutions.json'),'utf8'));
 const site=path.join(ROOT,'site');
@@ -39,7 +41,7 @@ async function jsonBody(req,max=4*1024*1024){if(!String(req.headers['content-typ
 async function multipart(req,max=BODY_LIMIT){if(!String(req.headers['content-type']).startsWith('multipart/form-data;'))throw fail(415,'Нужна форма с файлами.');const bytes=await body(req,max);try{return await new Request('http://localhost/',{method:'POST',headers:{'Content-Type':req.headers['content-type']},body:bytes}).formData();}catch{throw fail(400,'Не удалось прочитать файлы.');}}
 function session(req,write=false){const token=String(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('fp_session='))?.slice(11);if(!token)throw fail(401,'Войдите в панель управления.');const row=db.prepare('SELECT * FROM sessions WHERE hash=? AND expires>?').get(hash(token),Date.now());if(!row)throw fail(401,'Сессия завершена. Войдите снова.');if(write&&req.headers['x-csrf-token']!==row.csrf)throw fail(403,'Обновите страницу и повторите действие.');return row;}
 const disposition=name=>'attachment; filename="document"; filename*=UTF-8\'\''+encodeURIComponent(name).replace(/['()*]/g,c=>'%'+c.charCodeAt(0).toString(16));
-async function serveFile(req,res,file,extra={}){try{const info=await stat(file);if(!info.isFile())throw Error();const bytes=await readFile(file);res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Content-Length':bytes.length,'Cache-Control':'no-cache',...extra});res.end(req.method==='HEAD'?undefined:bytes);return true;}catch{return false;}}
+const serveFile=(req,res,file,extra={})=>servePublicFile(req,res,file,types,extra);
 function signature(buf,ext){const b=buf.subarray(0,256);if(ext==='pdf')return b.subarray(0,5).toString()==='%PDF-';if(['jpg','jpeg'].includes(ext))return b[0]===255&&b[1]===216&&b[2]===255;if(ext==='png')return b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]));if(ext==='webp')return b.subarray(0,4).toString()==='RIFF'&&b.subarray(8,12).toString()==='WEBP';if(['zip','docx','xlsx'].includes(ext))return b[0]===80&&b[1]===75&&[3,5,7].includes(b[2]);if(ext==='dwg')return /^AC10\d{2}/.test(b.toString());if(ext==='dxf')return /SECTION|AutoCAD Binary DXF/.test(b.toString());if(ext==='txt')return !buf.includes(0);return false;}
 async function getFiles(form,imagesOnly=false){const entries=form.getAll('files').filter(f=>typeof f!=='string'&&f.size);if(entries.length>(imagesOnly?1:5))throw fail(422,'Допустимо не более 5 файлов.');let total=0;const files=[];for(const f of entries){total+=f.size;if(f.size>FILE_LIMIT||total>TOTAL_LIMIT)throw fail(413,'Не более 10 МБ на файл и 25 МБ суммарно.');const name=path.basename(f.name.replaceAll('\\','/')).replace(/[\r\n\u0000-\u001f]/g,'').slice(0,180),ext=name.split('.').at(-1).toLowerCase(),bytes=Buffer.from(await f.arrayBuffer());if((imagesOnly&&!['jpg','jpeg','png','webp'].includes(ext))||!signature(bytes,ext))throw fail(422,'Неподдерживаемый или повреждённый файл: '+name);files.push({id:randomUUID(),name,size:f.size,ext,bytes});}return files;}
 function leadPayload(f){const get=(name,max,required=false)=>text(f.get(name)||'',max,required);const services=[...new Set(f.getAll('service'))];if(!services.length||services.some(s=>!SERVICE_IDS.includes(s)))throw fail(422,'Выберите направление работ.');const p={services,kind:get('kind',20)||'request',object:get('object',100,true),city:get('city',120,true),area:get('area',30),timing:get('timing',100,true),documents:get('documents',150),comment:get('comment',3000),name:get('name',100,true),company:get('company',150),phone:get('phone',40),email:get('email',200),height:get('height',80),system:get('system',150),deadline:get('deadline',30),solution:get('solution',20),audience:get('audience',20),selection:get('selection',48)};
@@ -122,6 +124,16 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
  }
  const selectionAPI=route.match(/^\/api\/selection\/([a-f0-9]{48})$/);
  if(selectionAPI&&req.method==='GET'){const selection=getShowcase(selectionAPI[1]);res.setHeader('Referrer-Policy','no-referrer');json(res,200,{title:selection.title,projects:selection.projects.map(p=>p.id)});return;}
+ if(route==='/api/public/contractor-kit'&&req.method==='GET'){
+  const c=content();json(res,200,{projects:c.projects.filter(p=>p.published!==false).map(p=>({id:p.id,title:p.title,location:p.location})),documents:kitDocuments(c).map(d=>({id:d.id,title:d.title}))});return;
+ }
+ if(route==='/api/contractor-kit'&&req.method==='POST'){
+  if(!rate('portfolio:'+ip(req),12,600000))throw fail(429,'Слишком много подборок. Попробуйте через несколько минут.');
+  const input=await jsonBody(req,5000),job=await selectKit(input,content()),zip=await createKit({...job,version:VERSION});
+  const latest=await selectKit(input,content());
+  if(latest.documents.some((d,i)=>d.file!==job.documents[i].file))throw fail(422,'Документы обновились. Повторите сборку пакета.');
+  res.writeHead(200,{'Content-Type':'application/zip','Content-Length':zip.length,'Content-Disposition':disposition('ФАСАД_PRO_пакет_подрядчика.zip'),'Cache-Control':'no-store'});res.end(zip);return;
+ }
  if(route==='/api/portfolio'&&req.method==='POST'){
   if(!rate('portfolio:'+ip(req),12,600000))throw fail(429,'Слишком много подборок. Попробуйте через несколько минут.');
   const input=await jsonBody(req,5000),ids=input.projects;
@@ -158,7 +170,15 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
    const b=await jsonBody(req),next=validateContent(b.content),project=next.projects.find(p=>p.id===b.project);
    if(!project)throw fail(422,'Сначала укажите адрес проекта.');project.published=true;
    const dir=await render(next);
-   try{const html=await readFile(path.join(dir,'public','projects',project.id+'.html'),'utf8');json(res,200,{html:html.replace('<head>','<head><base href="'+origin(req)+'/projects/">')});}finally{await rm(dir,{recursive:true,force:true});}
+   try{
+    let html=await readFile(path.join(dir,'public','projects',project.id+'.html'),'utf8');
+    // Draft previews can require a script combination absent from published pages.
+    const css=['styles','enhancements','business','release4','visual5','museum','release6','release7','release8','release9'];
+    const js=['app','public','request','release4','visual5','museum','release6','release7','release8','release9'];
+    html=html.replace(/<link rel="stylesheet" href="[^"]*bundles\/site-[a-f0-9]+\.css">/,css.map(n=>'<link rel="stylesheet" href="/'+n+'.css">').join(''));
+    html=html.replace(/<script src="[^"]*bundles\/page-[a-f0-9]+\.js" defer><\/script>/,js.map(n=>'<script src="/'+n+'.js" defer></script>').join(''));
+    json(res,200,{html:html.replace('<head>','<head><base href="'+origin(req)+'/projects/">')});
+   }finally{await rm(dir,{recursive:true,force:true});}
    return;
   }
   if(route==='/api/admin/showcases'){
@@ -222,7 +242,7 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
   if(route==='/admin'){res.writeHead(308,{Location:'/admin/'});res.end();return;}
   const relative=route==='/'?'index.html':route==='/admin/'?'admin/index.html':route.slice(1);
   if(relative.split('/').some(p=>p.startsWith('.')||p==='..')||relative.includes('\0')||relative.includes('\\'))throw fail(404,'Страница не найдена.');
-  const generated=relative.endsWith('.html')&&!relative.startsWith('admin/')||relative==='sitemap.xml';
+  const generated=relative.endsWith('.html')&&!relative.startsWith('admin/')||relative==='sitemap.xml'||relative.startsWith('bundles/');
   const root=generated?activePublic:site;
   const file=path.resolve(root,relative);if(file.startsWith(root+path.sep)&&await serveFile(req,res,file,relative.startsWith('admin/')?{'X-Robots-Tag':'noindex, nofollow','Cache-Control':'no-store'}:{}))return;
  }

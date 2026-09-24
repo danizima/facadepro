@@ -10,3 +10,5 @@ site/_qa*
 *.sqlite*
 
 artifacts/
+
+site/bundles/
