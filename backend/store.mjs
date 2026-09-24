@@ -1,4 +1,5 @@
 import {upgradeContent,validateExtras,validateWorkflow} from './content6.mjs';
+import {validateMaterials} from './content7.mjs';
 import {DatabaseSync} from 'node:sqlite';
 import {mkdirSync,readFileSync,writeFileSync,existsSync} from 'node:fs';
 import path from 'node:path';
@@ -66,5 +67,5 @@ export function validateContent(input){
  if(!projects.some(p=>p.published))throw fail(422,'Оставьте хотя бы один опубликованный проект.');
  const workflow=validateWorkflow(input.workflow);
  for(const row of workflow){const project=projects.find(p=>p.id===row.project);if(!project||!project.images.includes(row.image))throw fail(422,'Фотография этапа должна принадлежать выбранному проекту.');}
- return {schemaVersion:6,settings,projects,workflow};
+ return {schemaVersion:6,settings,projects,workflow,materials:validateMaterials(input.materials,projects)};
 }

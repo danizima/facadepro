@@ -1,9 +1,10 @@
 import {allContentImages} from './backend/content6.mjs';
+import {publicMaterials} from './backend/content7.mjs';
 import {saveShowcase,listShowcases,getShowcase,showcaseHTML,closedShowcaseHTML} from './backend/showcases.mjs';
 import {notificationConfig,notificationPublic,saveNotifications,smtpEnvironment,sendTelegram,telegramRequest,queueTelegram,scheduleReminders,reminderStillRelevant,telegramMessage,localClock} from './backend/notifications.mjs';
 import http from 'node:http';
 import {readFile,writeFile,stat,mkdir,rm,readdir,rename} from 'node:fs/promises';
-import {existsSync} from 'node:fs';
+import {existsSync,createReadStream} from 'node:fs';
 import {spawn} from 'node:child_process';
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import path from 'node:path';
@@ -12,6 +13,8 @@ import {createPortfolio} from './backend/portfolio.mjs';
 import {listLeads,updateFollowup,reminders,todayParam,staff} from './backend/followups.mjs';
 const solutionCatalog=JSON.parse(await readFile(path.join(ROOT,'source/solutions.json'),'utf8'));
 const site=path.join(ROOT,'site');
+const VERSION=JSON.parse(await readFile(path.join(ROOT,'package.json'),'utf8')).version;
+await mkdir(path.join(DATA,'materials'),{recursive:true,mode:0o700});
 const production=process.env.NODE_ENV==='production';
 const PUBLIC_URL=process.env.PUBLIC_URL||'';
 if(production&&!/^https:\/\/[^/]+\/?$/.test(PUBLIC_URL))throw Error('Set PUBLIC_URL to the HTTPS origin before production startup.');
@@ -26,7 +29,7 @@ function runPython(script,input,env={},timeout=30000){return new Promise((resolv
 async function render(next){const id=randomUUID(),dir=path.join(DATA,'render-'+id);await mkdir(dir);await writeFile(path.join(dir,'content.json'),JSON.stringify(next));try{await runPython(path.join(ROOT,'build.py'),'',{FACADE_CONTENT:path.join(dir,'content.json'),FACADE_OUTPUT:path.join(dir,'public')});return dir;}catch(e){await rm(dir,{recursive:true,force:true});throw e;}}
 const initialRender=await render(content());activePublic=path.join(initialRender,'public');
 for(const entry of await readdir(DATA)){if(entry.startsWith('render-')&&entry!==path.basename(initialRender))await rm(path.join(DATA,entry),{recursive:true,force:true});}
-function headers(res){res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('X-Frame-Options','SAMEORIGIN');res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');res.setHeader('Content-Security-Policy',"default-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");if(production)res.setHeader('Strict-Transport-Security','max-age=31536000');}
+function headers(res){res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('X-Frame-Options','SAMEORIGIN');res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');res.setHeader('Content-Security-Policy',"default-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org; media-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");if(production)res.setHeader('Strict-Transport-Security','max-age=31536000');}
 function json(res,status,data,extra={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...extra});res.end(JSON.stringify(data));}
 function ip(req){return TRUST_PROXY?String(req.headers['x-forwarded-for']||req.socket.remoteAddress).split(',').at(-1).trim():req.socket.remoteAddress;}
 function origin(req){return PUBLIC_URL?new URL(PUBLIC_URL).origin:'http://'+req.headers.host;}
@@ -41,12 +44,41 @@ function signature(buf,ext){const b=buf.subarray(0,256);if(ext==='pdf')return b.
 async function getFiles(form,imagesOnly=false){const entries=form.getAll('files').filter(f=>typeof f!=='string'&&f.size);if(entries.length>(imagesOnly?1:5))throw fail(422,'Допустимо не более 5 файлов.');let total=0;const files=[];for(const f of entries){total+=f.size;if(f.size>FILE_LIMIT||total>TOTAL_LIMIT)throw fail(413,'Не более 10 МБ на файл и 25 МБ суммарно.');const name=path.basename(f.name.replaceAll('\\','/')).replace(/[\r\n\u0000-\u001f]/g,'').slice(0,180),ext=name.split('.').at(-1).toLowerCase(),bytes=Buffer.from(await f.arrayBuffer());if((imagesOnly&&!['jpg','jpeg','png','webp'].includes(ext))||!signature(bytes,ext))throw fail(422,'Неподдерживаемый или повреждённый файл: '+name);files.push({id:randomUUID(),name,size:f.size,ext,bytes});}return files;}
 function leadPayload(f){const get=(name,max,required=false)=>text(f.get(name)||'',max,required);const services=[...new Set(f.getAll('service'))];if(!services.length||services.some(s=>!SERVICE_IDS.includes(s)))throw fail(422,'Выберите направление работ.');const p={services,kind:get('kind',20)||'request',object:get('object',100,true),city:get('city',120,true),area:get('area',30),timing:get('timing',100,true),documents:get('documents',150),comment:get('comment',3000),name:get('name',100,true),company:get('company',150),phone:get('phone',40),email:get('email',200),height:get('height',80),system:get('system',150),deadline:get('deadline',30),solution:get('solution',20),audience:get('audience',20),selection:get('selection',48)};
  if(p.audience&&!['contractor','developer','owner'].includes(p.audience))throw fail(422,'Проверьте выбранный сценарий.');if(p.selection){const shared=getShowcase(p.selection);p.selectionTitle=shared.title;} 
- if(p.solution&&!solutionCatalog.some(s=>s.id===p.solution))throw fail(422,'Неизвестная задача.');if(!['request','quote'].includes(p.kind))throw fail(422,'Неизвестный тип заявки.');if(!p.email&&!p.phone)throw fail(422,'Укажите телефон или email.');if(p.email&&!emailOK(p.email))throw fail(422,'Проверьте email.');if(p.phone&&(!/^[+\d\s().-]+$/.test(p.phone)||p.phone.replace(/\D/g,'').length<7||p.phone.replace(/\D/g,'').length>15))throw fail(422,'Проверьте телефон.');if(p.area&&(!Number.isFinite(Number(p.area))||Number(p.area)<1||Number(p.area)>1e7))throw fail(422,'Проверьте площадь.');if(f.get('consent')!=='yes')throw fail(422,'Подтвердите согласие на обработку данных заявки.');if(p.kind==='quote'&&!p.company)throw fail(422,'Для запроса КП укажите компанию или «Частный заказчик».');p.consentAt=new Date().toISOString();p.policyVersion='2026-09-23';p.sourcePage=cleanPage(get('sourcePage',150)||'/request.html');return p;}
+ if(p.solution&&!solutionCatalog.some(s=>s.id===p.solution))throw fail(422,'Неизвестная задача.');if(!['request','quote'].includes(p.kind))throw fail(422,'Неизвестный тип заявки.');if(!p.email&&!p.phone)throw fail(422,'Укажите телефон или email.');if(p.email&&!emailOK(p.email))throw fail(422,'Проверьте email.');if(p.phone&&(!/^[+\d\s().-]+$/.test(p.phone)||p.phone.replace(/\D/g,'').length<7||p.phone.replace(/\D/g,'').length>15))throw fail(422,'Проверьте телефон.');if(p.area&&(!Number.isFinite(Number(p.area))||Number(p.area)<1||Number(p.area)>1e7))throw fail(422,'Проверьте площадь.');if(f.get('consent')!=='yes')throw fail(422,'Подтвердите согласие на обработку данных заявки.');if(p.kind==='quote'&&!p.company)throw fail(422,'Для запроса КП укажите компанию или «Частный заказчик».');p.consentAt=new Date().toISOString();p.policyVersion='2026-09-23';p.comparedProjects=comparedProjects(f.get('comparedProjects'));p.sourcePage=cleanPage(get('sourcePage',150)||'/request.html');return p;}
+function comparedProjects(value){
+ const ids=typeof value==='string'&&value?value.split(','):[];
+ if(ids.length>3||new Set(ids).size!==ids.length)throw fail(422,'Выберите до трёх разных проектов.');
+ const c=content(),rows=ids.map(id=>c.projects.find(p=>p.id===id&&p.published!==false));
+ if(rows.some(p=>!p))throw fail(422,'Обновите сравнение: один из проектов больше не опубликован.');
+ return rows.map(p=>({id:p.id,title:p.title}));
+}
+function callbackPayload(f){
+ const name=text(f.get('name')||'',100,true),phone=text(f.get('phone')||'',40,true),preferredTime=text(f.get('preferredTime')||'',160);
+ if(!/^[+\d\s().-]+$/.test(phone)||phone.replace(/\D/g,'').length<7||phone.replace(/\D/g,'').length>15)throw fail(422,'Проверьте номер телефона.');
+ if(f.get('consent')!=='yes')throw fail(422,'Подтвердите согласие на обработку данных.');
+ return {kind:'callback',services:[],object:'Обратный звонок',city:'Не указан',timing:preferredTime||'Уточнить',preferredTime,name,phone,email:'',company:'',comment:'Запрос обратного звонка',comparedProjects:comparedProjects(f.get('comparedProjects')),consentAt:new Date().toISOString(),policyVersion:'2026-09-23',sourcePage:cleanPage(text(f.get('sourcePage')||'/',150))};
+}
+async function materialFile(req,res,key){
+ if(!/^materials\/[a-f0-9-]{36}\.(pdf|mp4|webm)$/.test(key))throw fail(404,'Файл не найден.');
+ let allowed=publicMaterials(content()).some(r=>r.file===key);if(!allowed){try{session(req);allowed=true;}catch{}}
+ if(!allowed)throw fail(404,'Файл не найден.');
+ const file=path.join(DATA,key);let info;try{info=await stat(file);}catch{throw fail(404,'Файл не найден.');}
+ const mime=key.endsWith('.pdf')?'application/pdf':key.endsWith('.webm')?'video/webm':'video/mp4';
+ const extra={'Content-Type':mime,'Accept-Ranges':'bytes','Cache-Control':'private, no-store','Content-Disposition':(mime==='application/pdf'?'inline':'inline')};
+ let start=0,end=info.size-1,code=200;
+ if(req.headers.range){const m=/^bytes=(\d*)-(\d*)$/.exec(req.headers.range);if(!m||(!m[1]&&!m[2])){res.writeHead(416,{'Content-Range':'bytes */'+info.size});res.end();return;}
+  if(!m[1])start=Math.max(0,info.size-Number(m[2]));else{start=Number(m[1]);if(m[2])end=Math.min(end,Number(m[2]));}
+  if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start>end||start>=info.size){res.writeHead(416,{'Content-Range':'bytes */'+info.size});res.end();return;}
+  code=206;extra['Content-Range']='bytes '+start+'-'+end+'/'+info.size;
+ }
+ extra['Content-Length']=end-start+1;res.writeHead(code,extra);if(req.method==='HEAD'){res.end();return;}
+ const stream=createReadStream(file,{start,end});stream.on('error',()=>res.destroy());res.on('close',()=>stream.destroy());stream.pipe(res);
+}
 function cleanPage(s){const p=String(s).split('?')[0].split('#')[0];return /^\/(?:[a-z0-9-]+\/)?[a-z0-9-]*\.?[a-z]*$/.test(p)&&p.length<=150&&!p.startsWith('/admin')?p:'/';}
 function mailMessage(row){const lead=db.prepare('SELECT * FROM leads WHERE id=?').get(row.lead_id),p=JSON.parse(lead.payload),settings=content().settings,base=PUBLIC_URL||'';
  if(row.kind.startsWith('reminder_'))return {to:row.recipient,subject:'ФАСАД.PRO: напоминание '+lead.reference,body:telegramMessage(row,lead)+'\n\nСледующее действие: '+(lead.next_action||'Взять заявку в работу'),message_id:'<'+row.id+'@facadepro.ru>'};
  if(row.kind==='receipt')return {to:row.recipient,subject:'ФАСАД.PRO: заявка '+lead.reference+' принята',body:`Здравствуйте, ${p.name}!\n\nМы получили вашу заявку ${lead.reference}. Менеджер свяжется с вами для уточнения деталей.\n\n${settings.manager}\n${settings.phone}\n${settings.email}\n\nЭто подтверждение получения заявки, а не согласование цены или срока.`,message_id:`<${row.id}@facadepro.ru>`};
- const files=db.prepare('SELECT name,size FROM files WHERE lead_id=?').all(lead.id);return {to:row.recipient,reply_to:p.email||undefined,subject:`${p.kind==='quote'?'Запрос КП':'Новая заявка'} ${lead.reference} — ФАСАД.PRO`,body:[`Заявка: ${lead.reference}`,`Работы: ${p.services.map(s=>serviceNames[s]).join(', ')}`,`Объект: ${p.object}`,`Город: ${p.city}`,`Площадь: ${p.area||'Уточнить'}`,`Начало: ${p.timing}`,`Имя: ${p.name}`,`Компания: ${p.company||'—'}`,`Телефон: ${p.phone||'—'}`,`Email: ${p.email||'—'}`,`Комментарий: ${p.comment||'—'}`,`Файлы: ${files.map(f=>f.name).join(', ')||'Нет'}`,'',`Открыть в панели: ${base}/admin/#leads/${lead.id}`].join('\n'),message_id:`<${row.id}@facadepro.ru>`};}
+ const files=db.prepare('SELECT name,size FROM files WHERE lead_id=?').all(lead.id);return {to:row.recipient,reply_to:p.email||undefined,subject:`${p.kind==='quote'?'Запрос КП':p.kind==='callback'?'Обратный звонок':'Новая заявка'} ${lead.reference} — ФАСАД.PRO`,body:[`Заявка: ${lead.reference}`,`Работы: ${p.services.map(s=>serviceNames[s]).join(', ')||'Уточнить при звонке'}`,`Объект: ${p.object}`,`Город: ${p.city}`,`Площадь: ${p.area||'Уточнить'}`,`Начало: ${p.timing}`,`Имя: ${p.name}`,`Компания: ${p.company||'—'}`,`Телефон: ${p.phone||'—'}`,`Email: ${p.email||'—'}`,`Комментарий: ${p.comment||'—'}`,`Файлы: ${files.map(f=>f.name).join(', ')||'Нет'}`,'',`Открыть в панели: ${base}/admin/#leads/${lead.id}`].join('\n'),message_id:`<${row.id}@facadepro.ru>`};}
 async function flushMail(){
  if(mailWorking)return;mailWorking=true;
  try{
@@ -73,7 +105,9 @@ async function flushMail(){
 async function cleanup(){cleanSession();db.prepare('DELETE FROM events WHERE created<?').run(new Date(Date.now()-90*86400000).toISOString());const stale=db.prepare('SELECT id FROM leads WHERE created<?').all(new Date(Date.now()-180*86400000).toISOString());for(const row of stale){const files=db.prepare('SELECT id FROM files WHERE lead_id=?').all(row.id);transaction(()=>db.prepare('DELETE FROM leads WHERE id=?').run(row.id));for(const f of files)await rm(path.join(DATA,'uploads',f.id),{force:true});}db.prepare('DELETE FROM audit WHERE created<?').run(new Date(Date.now()-365*86400000).toISOString());}
 function stats(days){const since=new Date(Date.now()-days*86400000).toISOString(),get=(sql,...args)=>db.prepare(sql).all(...args);const sessions=db.prepare("SELECT COUNT(DISTINCT session_id) n FROM events WHERE event='page_view' AND created>=?").get(since).n;const stages=['page_view','request_start','step_2','step_3'];const funnel=stages.map(event=>({event,count:db.prepare('SELECT COUNT(DISTINCT session_id) n FROM events WHERE event=? AND created>=?').get(event,since).n}));funnel.push({event:'submitted',count:db.prepare('SELECT COUNT(DISTINCT session_id) n FROM leads WHERE created>=? AND session_id IS NOT NULL').get(since).n});return {days,sessions,leadPages:get("SELECT json_extract(payload,'$.sourcePage') page,COUNT(*) count FROM leads WHERE created>=? GROUP BY page ORDER BY count DESC",since),totalLeads:db.prepare('SELECT COUNT(*) n FROM leads WHERE created>=?').get(since).n,funnel,pages:get("SELECT page,COUNT(*) views,COUNT(DISTINCT session_id) visitors FROM events WHERE event='page_view' AND created>=? GROUP BY page ORDER BY views DESC LIMIT 15",since),services:get("SELECT detail service,COUNT(DISTINCT session_id) visitors FROM events WHERE event='service_interest' AND created>=? GROUP BY detail ORDER BY visitors DESC",since),sources:get("SELECT source,COUNT(DISTINCT session_id) visitors FROM events WHERE event='page_view' AND created>=? GROUP BY source ORDER BY visitors DESC LIMIT 10",since),leadsByDay:get('SELECT substr(created,1,10) day,COUNT(*) count FROM leads WHERE created>=? GROUP BY day ORDER BY day',since)};}
 const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new URL(req.url,origin(req));const route=decodeURIComponent(url.pathname);if(['POST','PUT','DELETE','PATCH'].includes(req.method))sameOrigin(req);if(req.method==='OPTIONS')throw fail(405,'Метод не поддерживается.');
- if(route==='/healthz'){json(res,200,{ok:true,version:'6.0.0'});return;}
+ if(route==='/healthz'){json(res,200,{ok:true,version:VERSION});return;}
+ if(route.startsWith('/materials/')&&['GET','HEAD'].includes(req.method)){await materialFile(req,res,route.slice(1));return;}
+ if(route==='/api/public/projects'&&req.method==='GET'){json(res,200,{projects:content().projects.filter(p=>p.published!==false).map(p=>({id:p.id,title:p.title,type:p.type,location:p.location,period:p.period,volume:p.volume,work:p.work,serviceIds:p.serviceIds,case:p.case,image:p.images[0]}))});return;}
  if(route==='/api/public/config'&&req.method==='GET'){const s=content().settings;json(res,200,{forms:true,portfolio:true,contact:{email:s.email,phone:s.phone,manager:s.manager},uploads:{count:5,fileBytes:FILE_LIMIT,totalBytes:TOTAL_LIMIT},policyVersion:'2026-09-23'});return;}
  const selectionMatch=route.match(/^\/selection\/([a-f0-9]{48})(\/pdf)?$/);
  if(selectionMatch){
@@ -96,9 +130,9 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
   const recipient=text(input.recipient||'',140),pdf=await createPortfolio({projects,settings:current.settings,recipient});
   res.writeHead(200,{'Content-Type':'application/pdf','Content-Length':pdf.length,'Content-Disposition':disposition('Портфолио_ФАСАД_PRO_подборка.pdf'),'Cache-Control':'no-store'});res.end(pdf);return;
  }
- if(route==='/api/requests'&&req.method==='POST'){
+ if(['/api/requests','/api/callback'].includes(route)&&req.method==='POST'){
   if(!rate('lead:'+ip(req),10,3600000))throw fail(429,'Слишком много заявок. Попробуйте позже или позвоните менеджеру.');
-  const f=await multipart(req);if(f.get('website'))throw fail(422,'Проверьте форму.');const key=text(f.get('idempotency')||'',80,true);if(!/^[a-f0-9-]{36}$/.test(key))throw fail(422,'Обновите страницу формы.');const p=leadPayload(f),files=await getFiles(f),digest=hash(JSON.stringify(p).replace(/"consentAt":"[^"]+",/,'')+files.map(x=>x.name+hash(x.bytes)).join('|'));const prior=db.prepare('SELECT reference,digest FROM leads WHERE idempotency=?').get(key);if(prior){if(prior.digest!==digest)throw fail(409,'Данные изменились. Обновите форму и повторите отправку.');json(res,200,{reference:prior.reference,received:true});return;}
+  const callback=route==='/api/callback';let f;if(callback){const b=await jsonBody(req,6000);f=new FormData();for(const k of ['name','phone','preferredTime','consent','website','idempotency','sourcePage','comparedProjects','analyticsSession']){if(b[k]!==undefined&&typeof b[k]!=='string')throw fail(422,'Проверьте поля формы.');f.set(k,b[k]??'');}}else f=await multipart(req);if(f.get('website'))throw fail(422,'Проверьте форму.');const key=text(f.get('idempotency')||'',80,true);if(!/^[a-f0-9-]{36}$/.test(key))throw fail(422,'Обновите страницу формы.');const p=callback?callbackPayload(f):leadPayload(f),files=callback?[]:await getFiles(f),digest=hash(JSON.stringify(p).replace(/"consentAt":"[^"]+",/,'')+files.map(x=>x.name+hash(x.bytes)).join('|'));const prior=db.prepare('SELECT reference,digest FROM leads WHERE idempotency=?').get(key);if(prior){if(prior.digest!==digest)throw fail(409,'Данные изменились. Обновите форму и повторите отправку.');json(res,200,{reference:prior.reference,received:true});return;}
   const id=randomUUID(),reference='FP-'+new Date().toISOString().slice(0,10).replaceAll('-','')+'-'+randomBytes(4).toString('hex').toUpperCase();const sid=/^[a-f0-9-]{36}$/.test(f.get('analyticsSession')||'')?f.get('analyticsSession'):null;
   try{for(const file of files)await writeFile(path.join(DATA,'uploads',file.id),file.bytes,{mode:0o600,flag:'wx'});transaction(()=>{db.prepare('INSERT INTO leads(id,reference,created,kind,payload,idempotency,digest,session_id) VALUES(?,?,?,?,?,?,?,?)').run(id,reference,new Date().toISOString(),p.kind,JSON.stringify(p),key,digest,sid);for(const file of files)db.prepare('INSERT INTO files VALUES(?,?,?,?,?)').run(file.id,id,file.name,file.size,file.ext);db.prepare('INSERT INTO outbox(id,lead_id,recipient,kind) VALUES(?,?,?,?)').run(randomUUID(),id,notificationConfig().leadTo,'manager');if(p.email)db.prepare('INSERT INTO outbox(id,lead_id,recipient,kind) VALUES(?,?,?,?)').run(randomUUID(),id,p.email,'receipt');queueTelegram(id);});}catch(e){for(const file of files)await rm(path.join(DATA,'uploads',file.id),{force:true});throw e;}
   json(res,201,{reference,received:true});void flushMail();return;
@@ -116,7 +150,7 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
   if(route==='/api/admin/password'&&req.method==='POST'){const b=await jsonBody(req,4000);if(!passwordValid(text(b.current,300,true),db.prepare('SELECT password FROM admins WHERE username=?').get(s.username).password))throw fail(422,'Текущий пароль неверен.');const pass=text(b.password,300,true);if(pass.length<14)throw fail(422,'Минимум 14 символов.');db.prepare('UPDATE admins SET password=? WHERE username=?').run(passwordHash(pass),s.username);db.prepare('DELETE FROM sessions WHERE username=? AND hash<>?').run(s.username,s.hash);audit(s.username,'password_changed');json(res,200,{ok:true});return;}
   if(route==='/api/admin/content'&&req.method==='GET'){json(res,200,content());return;}
   if(route==='/api/admin/content'&&req.method==='PUT'){
-   const b=await jsonBody(req),next=validateContent(b);for(const key of allContentImages(next)){const file=key.startsWith('media/')?path.join(DATA,key):path.join(site,'assets',key+'.webp');if(!existsSync(file))throw fail(422,'Фотография не найдена. Загрузите её снова.');}
+   const b=await jsonBody(req),next=validateContent(b);for(const r of next.materials){if(r.file&&!existsSync(path.join(DATA,r.file)))throw fail(422,'Файл материала не найден. Загрузите его снова.');}for(const key of allContentImages(next)){const file=key.startsWith('media/')?path.join(DATA,key):path.join(site,'assets',key+'.webp');if(!existsSync(file))throw fail(422,'Фотография не найдена. Загрузите её снова.');}
    const task=publishQueue.then(async()=>{const current=content();if(b.revision!==current.revision)throw fail(409,'Сайт изменён в другой вкладке. Обновите данные.');const dir=await render(next),old=activePublic;transaction(()=>{db.prepare('UPDATE content SET revision=revision+1,json=? WHERE id=1').run(JSON.stringify(next));audit(s.username,'content_published');});activePublic=path.join(dir,'public');setTimeout(()=>rm(path.dirname(old),{recursive:true,force:true}).catch(()=>{}),30000).unref();return current.revision+1;});publishQueue=task.catch(()=>{});const revision=await task;json(res,200,{...next,revision});return;
   }
   if(route==='/api/admin/preview'&&req.method==='POST'){
@@ -156,6 +190,15 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
    const updates=await telegramRequest('getUpdates',{limit:30,timeout:0},c),chats=new Map();
    for(const u of updates){const chat=u.message?.chat||u.my_chat_member?.chat;if(chat)chats.set(String(chat.id),{id:String(chat.id),title:chat.title||chat.first_name||chat.username||String(chat.id)});}
    json(res,200,{chats:[...chats.values()]});return;
+  }
+  if(route==='/api/admin/materials/upload'&&req.method==='POST'){
+   const f=await multipart(req,61*1024*1024),files=f.getAll('files');
+   if(files.length!==1||typeof files[0]==='string')throw fail(422,'Загрузите один файл.');
+   const file=files[0],ext=file.name.split('.').at(-1).toLowerCase();
+   if(!['pdf','mp4','webm'].includes(ext)||!file.size||file.size>(ext==='pdf'?15:60)*1024*1024)throw fail(422,'PDF — до 15 МБ; MP4 и WebM — до 60 МБ.');
+   const bytes=Buffer.from(await file.arrayBuffer()),valid=ext==='pdf'?bytes.subarray(0,5).toString()==='%PDF-':ext==='mp4'?bytes.subarray(4,8).toString()==='ftyp':bytes.subarray(0,4).equals(Buffer.from([0x1a,0x45,0xdf,0xa3]));
+   if(!valid)throw fail(422,'Формат файла не соответствует расширению.');
+   const key='materials/'+randomUUID()+'.'+ext;await writeFile(path.join(DATA,key),bytes,{mode:0o600,flag:'wx'});audit(s.username,'material_uploaded',key);json(res,201,{key,url:'/'+key});return;
   }
   if(route==='/api/admin/media'&&req.method==='POST'){const form=await multipart(req,FILE_LIMIT+65536),files=await getFiles(form,true);if(files.length!==1)throw fail(422,'Выберите фотографию.');const f=files[0],ext=f.ext==='jpeg'?'jpg':f.ext,key='media/'+f.id+'.'+ext;await writeFile(path.join(DATA,key),f.bytes,{mode:0o600,flag:'wx'});audit(s.username,'photo_uploaded',key);json(res,201,{key,url:'/'+key});return;}
   if(route==='/api/admin/stats'&&req.method==='GET'){const days=[7,30,90].includes(Number(url.searchParams.get('days')))?Number(url.searchParams.get('days')):30;json(res,200,stats(days));return;}

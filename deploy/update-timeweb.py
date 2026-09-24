@@ -15,7 +15,7 @@ import urllib.request
 APP = Path('/opt/facadepro')
 REPO = 'https://github.com/danizima/facadepro.git'
 DOMAIN = 'facadepro.ru'
-VERSION = '6.0.0'
+VERSION = None
 
 def command(*args, live=False, timeout=60):
     p = subprocess.run(args, text=True, capture_output=not live, timeout=timeout)
@@ -50,6 +50,7 @@ def main():
     require(os.geteuid() == 0, 'Запустите обновление от root.')
     require(len(sys.argv) == 2 and re.fullmatch(r'[a-f0-9]{40}', sys.argv[1]),
             'Укажите полный SHA опубликованного выпуска после имени скрипта.')
+    global VERSION
     target = sys.argv[1]
     os.umask(0o077)
     lock = open('/run/lock/facadepro-install.lock', 'w')
@@ -84,13 +85,17 @@ def main():
     command('git', '-C', str(APP), 'merge-base', '--is-ancestor', old_commit, target)
     command('git', '-C', str(APP), 'merge-base', '--is-ancestor', target, 'origin/main')
     manifest = json.loads(command('git', '-C', str(APP), 'show', target + ':package.json'))
-    require(manifest['name'] == 'facadepro-website' and manifest['version'] == VERSION,
-            'Этот установщик рассчитан на выпуск ' + VERSION + '.')
+    VERSION = manifest.get('version', '')
+    require(manifest.get('name') == 'facadepro-website' and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', VERSION),
+            'В выбранном коммите нет корректного выпуска ФАСАД.PRO.')
     if old_commit == target:
-        health(VERSION)
-        print('Версия ' + VERSION + ' уже установлена.')
-        return
-    backup = Path('/root/facadepro-backups') / (time.strftime('%Y%m%d-%H%M%S') + '-v6-update')
+        try:
+            health(VERSION)
+            print('Версия ' + VERSION + ' уже установлена.')
+            return
+        except RuntimeError:
+            print('Исходники актуальны, но образ требует обновления.', flush=True)
+    backup = Path('/root/facadepro-backups') / (time.strftime('%Y%m%d-%H%M%S') + '-release-update')
     backup.mkdir(parents=True, mode=0o700)
     (backup / 'previous-commit.txt').write_text(old_commit + '\n')
     (backup / 'previous-image.txt').write_text(old_image + '\n')

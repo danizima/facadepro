@@ -74,5 +74,77 @@
   "museum-2025-06": [
     1024,
     683
+  ],
+  "brusnika-small": [
+    600,
+    338
+  ],
+  "nakhodka-small": [
+    600,
+    450
+  ],
+  "milya-small": [
+    600,
+    338
+  ],
+  "burny-small": [
+    560,
+    315
+  ],
+  "lider-small": [
+    600,
+    400
+  ],
+  "dom-s-uglom-small": [
+    600,
+    399
+  ],
+  "museum-small": [
+    560,
+    385
+  ],
+  "restaurant-frame-small": [
+    600,
+    450
+  ],
+  "restaurant-build-small": [
+    600,
+    450
+  ],
+  "novy-small": [
+    600,
+    400
+  ],
+  "restaurant-facade-small": [
+    562,
+    750
+  ],
+  "museum-2025-05-small": [
+    560,
+    374
+  ],
+  "museum-facade-small": [
+    597,
+    750
+  ],
+  "restaurant-small": [
+    562,
+    750
+  ],
+  "meridiany-small": [
+    1600,
+    1066
+  ],
+  "museum-2025-06-small": [
+    560,
+    374
+  ],
+  "museum-detail-small": [
+    597,
+    750
+  ],
+  "golden-horn-small": [
+    600,
+    450
   ]
 }

@@ -8,3 +8,5 @@ __pycache__/
 *.pyc
 site/_qa*
 *.sqlite*
+
+artifacts/

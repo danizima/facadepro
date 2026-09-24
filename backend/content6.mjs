@@ -7,6 +7,7 @@ export const imageKey=v=>typeof v==='string'&&/^([a-z0-9-]+|media\/[a-f0-9-]+\.(
 const date=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&!isNaN(Date.parse(v))&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v;
 export function upgradeContent(value){
  value.schemaVersion=6;
+ value.materials??=[];
  value.workflow??=structuredClone(defaults.workflow).filter(r=>value.projects.some(p=>p.id===r.project&&p.images.includes(r.image)));
  for(const p of value.projects){
   p.reports??=p.id==='museum'?museum.map(r=>({...r,published:true,dateKind:'publication'})):[];

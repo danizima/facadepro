@@ -1,0 +1,53 @@
+name: Verify Facadepro release
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.19.0'
+      - name: Install PDF and browser libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-reportlab python3-pil libnss3 libatk-bridge2.0-0 libxkbcommon0 libgbm1 libasound2t64 fonts-dejavu-core
+      - name: Check syntax and build pages
+        run: |
+          npm run check
+          npm run build
+          python3 -m py_compile deploy/*.py
+      - name: Test server and update controller
+        run: npm test
+      - name: Build production image
+        run: docker build -t facadepro-ci:${{ github.sha }} .
+      - name: Install pinned browser test tools
+        run: npm install --prefix "$RUNNER_TEMP/facade-browser" playwright@1.62.1 @sparticuz/chromium@153.0.0 --no-audit --no-fund
+      - name: Check desktop and mobile flows
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/facade-browser/node_modules/playwright
+          CHROMIUM_MODULE: ${{ runner.temp }}/facade-browser/node_modules/@sparticuz/chromium
+          BROWSER_BIN_DIR: ${{ runner.temp }}/facade-chromium
+          CHROMIUM_EXECUTABLE_PATH: ${{ runner.temp }}/facade-chromium/chromium
+        run: |
+          node scripts/prepare-browser.mjs
+          node tests/browser.mjs
+      - name: Save screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-${{ github.sha }}
+          path: artifacts/browser
+          if-no-files-found: ignore
+          retention-days: 7
