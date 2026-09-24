@@ -1,14 +1,14 @@
 {
   "name": "facadepro-website",
-  "version": "5.1.0",
+  "version": "6.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "node server.mjs",
     "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check backend/store.mjs && node --check site/app.js && node --check site/public.js && node --check site/request.js && node --check site/admin/admin.js && node --check site/release4.js && node --check backend/followups.mjs && node --check backend/portfolio.mjs && node --check scripts/admin-demo.js && node --check site/visual5.js && node --check site/museum.js",
+    "check": "node --check server.mjs && node --check backend/store.mjs && node --check site/app.js && node --check site/public.js && node --check site/request.js && node --check site/admin/admin.js && node --check site/release4.js && node --check backend/followups.mjs && node --check backend/portfolio.mjs && node --check scripts/admin-demo.js && node --check site/visual5.js && node --check site/museum.js && node --check backend/content6.mjs && node --check backend/showcases.mjs && node --check backend/notifications.mjs && node --check site/release6.js && node --check site/admin/release6.js",
     "build": "python3 build.py",
-    "test": "node tests/integration.mjs",
+    "test": "node tests/integration.mjs && node tests/release6.mjs && python3 tests/update-timeweb.py",
     "admin:create": "node scripts/create-admin.mjs"
   },
   "engines": {

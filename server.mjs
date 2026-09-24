@@ -1,3 +1,6 @@
+import {allContentImages} from './backend/content6.mjs';
+import {saveShowcase,listShowcases,getShowcase,showcaseHTML,closedShowcaseHTML} from './backend/showcases.mjs';
+import {notificationConfig,notificationPublic,saveNotifications,smtpEnvironment,sendTelegram,telegramRequest,queueTelegram,scheduleReminders,reminderStillRelevant,telegramMessage,localClock} from './backend/notifications.mjs';
 import http from 'node:http';
 import {readFile,writeFile,stat,mkdir,rm,readdir,rename} from 'node:fs/promises';
 import {existsSync} from 'node:fs';
@@ -29,25 +32,62 @@ function ip(req){return TRUST_PROXY?String(req.headers['x-forwarded-for']||req.s
 function origin(req){return PUBLIC_URL?new URL(PUBLIC_URL).origin:'http://'+req.headers.host;}
 function sameOrigin(req){const incoming=req.headers.origin;if(!incoming||incoming!==origin(req)||req.headers['sec-fetch-site']==='cross-site')throw fail(403,'Запрос с другого сайта отклонён.');}
 async function body(req,max=BODY_LIMIT){const length=Number(req.headers['content-length']||0);if(length>max)throw fail(413,'Слишком большой запрос.');let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>max)throw fail(413,'Превышен допустимый размер.');chunks.push(chunk);}return Buffer.concat(chunks);}
-async function jsonBody(req,max=300000){if(!String(req.headers['content-type']).includes('application/json'))throw fail(415,'Нужен JSON.');try{return JSON.parse((await body(req,max)).toString());}catch(e){if(e.status)throw e;throw fail(400,'Некорректный запрос.');}}
+async function jsonBody(req,max=4*1024*1024){if(!String(req.headers['content-type']).includes('application/json'))throw fail(415,'Нужен JSON.');try{return JSON.parse((await body(req,max)).toString());}catch(e){if(e.status)throw e;throw fail(400,'Некорректный запрос.');}}
 async function multipart(req,max=BODY_LIMIT){if(!String(req.headers['content-type']).startsWith('multipart/form-data;'))throw fail(415,'Нужна форма с файлами.');const bytes=await body(req,max);try{return await new Request('http://localhost/',{method:'POST',headers:{'Content-Type':req.headers['content-type']},body:bytes}).formData();}catch{throw fail(400,'Не удалось прочитать файлы.');}}
 function session(req,write=false){const token=String(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('fp_session='))?.slice(11);if(!token)throw fail(401,'Войдите в панель управления.');const row=db.prepare('SELECT * FROM sessions WHERE hash=? AND expires>?').get(hash(token),Date.now());if(!row)throw fail(401,'Сессия завершена. Войдите снова.');if(write&&req.headers['x-csrf-token']!==row.csrf)throw fail(403,'Обновите страницу и повторите действие.');return row;}
 const disposition=name=>'attachment; filename="document"; filename*=UTF-8\'\''+encodeURIComponent(name).replace(/['()*]/g,c=>'%'+c.charCodeAt(0).toString(16));
 async function serveFile(req,res,file,extra={}){try{const info=await stat(file);if(!info.isFile())throw Error();const bytes=await readFile(file);res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Content-Length':bytes.length,'Cache-Control':'no-cache',...extra});res.end(req.method==='HEAD'?undefined:bytes);return true;}catch{return false;}}
 function signature(buf,ext){const b=buf.subarray(0,256);if(ext==='pdf')return b.subarray(0,5).toString()==='%PDF-';if(['jpg','jpeg'].includes(ext))return b[0]===255&&b[1]===216&&b[2]===255;if(ext==='png')return b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]));if(ext==='webp')return b.subarray(0,4).toString()==='RIFF'&&b.subarray(8,12).toString()==='WEBP';if(['zip','docx','xlsx'].includes(ext))return b[0]===80&&b[1]===75&&[3,5,7].includes(b[2]);if(ext==='dwg')return /^AC10\d{2}/.test(b.toString());if(ext==='dxf')return /SECTION|AutoCAD Binary DXF/.test(b.toString());if(ext==='txt')return !buf.includes(0);return false;}
 async function getFiles(form,imagesOnly=false){const entries=form.getAll('files').filter(f=>typeof f!=='string'&&f.size);if(entries.length>(imagesOnly?1:5))throw fail(422,'Допустимо не более 5 файлов.');let total=0;const files=[];for(const f of entries){total+=f.size;if(f.size>FILE_LIMIT||total>TOTAL_LIMIT)throw fail(413,'Не более 10 МБ на файл и 25 МБ суммарно.');const name=path.basename(f.name.replaceAll('\\','/')).replace(/[\r\n\u0000-\u001f]/g,'').slice(0,180),ext=name.split('.').at(-1).toLowerCase(),bytes=Buffer.from(await f.arrayBuffer());if((imagesOnly&&!['jpg','jpeg','png','webp'].includes(ext))||!signature(bytes,ext))throw fail(422,'Неподдерживаемый или повреждённый файл: '+name);files.push({id:randomUUID(),name,size:f.size,ext,bytes});}return files;}
-function leadPayload(f){const get=(name,max,required=false)=>text(f.get(name)||'',max,required);const services=[...new Set(f.getAll('service'))];if(!services.length||services.some(s=>!SERVICE_IDS.includes(s)))throw fail(422,'Выберите направление работ.');const p={services,kind:get('kind',20)||'request',object:get('object',100,true),city:get('city',120,true),area:get('area',30),timing:get('timing',100,true),documents:get('documents',150),comment:get('comment',3000),name:get('name',100,true),company:get('company',150),phone:get('phone',40),email:get('email',200),height:get('height',80),system:get('system',150),deadline:get('deadline',30),solution:get('solution',20)};
+function leadPayload(f){const get=(name,max,required=false)=>text(f.get(name)||'',max,required);const services=[...new Set(f.getAll('service'))];if(!services.length||services.some(s=>!SERVICE_IDS.includes(s)))throw fail(422,'Выберите направление работ.');const p={services,kind:get('kind',20)||'request',object:get('object',100,true),city:get('city',120,true),area:get('area',30),timing:get('timing',100,true),documents:get('documents',150),comment:get('comment',3000),name:get('name',100,true),company:get('company',150),phone:get('phone',40),email:get('email',200),height:get('height',80),system:get('system',150),deadline:get('deadline',30),solution:get('solution',20),audience:get('audience',20),selection:get('selection',48)};
+ if(p.audience&&!['contractor','developer','owner'].includes(p.audience))throw fail(422,'Проверьте выбранный сценарий.');if(p.selection){const shared=getShowcase(p.selection);p.selectionTitle=shared.title;} 
  if(p.solution&&!solutionCatalog.some(s=>s.id===p.solution))throw fail(422,'Неизвестная задача.');if(!['request','quote'].includes(p.kind))throw fail(422,'Неизвестный тип заявки.');if(!p.email&&!p.phone)throw fail(422,'Укажите телефон или email.');if(p.email&&!emailOK(p.email))throw fail(422,'Проверьте email.');if(p.phone&&(!/^[+\d\s().-]+$/.test(p.phone)||p.phone.replace(/\D/g,'').length<7||p.phone.replace(/\D/g,'').length>15))throw fail(422,'Проверьте телефон.');if(p.area&&(!Number.isFinite(Number(p.area))||Number(p.area)<1||Number(p.area)>1e7))throw fail(422,'Проверьте площадь.');if(f.get('consent')!=='yes')throw fail(422,'Подтвердите согласие на обработку данных заявки.');if(p.kind==='quote'&&!p.company)throw fail(422,'Для запроса КП укажите компанию или «Частный заказчик».');p.consentAt=new Date().toISOString();p.policyVersion='2026-09-23';p.sourcePage=cleanPage(get('sourcePage',150)||'/request.html');return p;}
 function cleanPage(s){const p=String(s).split('?')[0].split('#')[0];return /^\/(?:[a-z0-9-]+\/)?[a-z0-9-]*\.?[a-z]*$/.test(p)&&p.length<=150&&!p.startsWith('/admin')?p:'/';}
 function mailMessage(row){const lead=db.prepare('SELECT * FROM leads WHERE id=?').get(row.lead_id),p=JSON.parse(lead.payload),settings=content().settings,base=PUBLIC_URL||'';
+ if(row.kind.startsWith('reminder_'))return {to:row.recipient,subject:'ФАСАД.PRO: напоминание '+lead.reference,body:telegramMessage(row,lead)+'\n\nСледующее действие: '+(lead.next_action||'Взять заявку в работу'),message_id:'<'+row.id+'@facadepro.ru>'};
  if(row.kind==='receipt')return {to:row.recipient,subject:'ФАСАД.PRO: заявка '+lead.reference+' принята',body:`Здравствуйте, ${p.name}!\n\nМы получили вашу заявку ${lead.reference}. Менеджер свяжется с вами для уточнения деталей.\n\n${settings.manager}\n${settings.phone}\n${settings.email}\n\nЭто подтверждение получения заявки, а не согласование цены или срока.`,message_id:`<${row.id}@facadepro.ru>`};
  const files=db.prepare('SELECT name,size FROM files WHERE lead_id=?').all(lead.id);return {to:row.recipient,reply_to:p.email||undefined,subject:`${p.kind==='quote'?'Запрос КП':'Новая заявка'} ${lead.reference} — ФАСАД.PRO`,body:[`Заявка: ${lead.reference}`,`Работы: ${p.services.map(s=>serviceNames[s]).join(', ')}`,`Объект: ${p.object}`,`Город: ${p.city}`,`Площадь: ${p.area||'Уточнить'}`,`Начало: ${p.timing}`,`Имя: ${p.name}`,`Компания: ${p.company||'—'}`,`Телефон: ${p.phone||'—'}`,`Email: ${p.email||'—'}`,`Комментарий: ${p.comment||'—'}`,`Файлы: ${files.map(f=>f.name).join(', ')||'Нет'}`,'',`Открыть в панели: ${base}/admin/#leads/${lead.id}`].join('\n'),message_id:`<${row.id}@facadepro.ru>`};}
-async function flushMail(){if(mailWorking||!process.env.SMTP_HOST||!process.env.SMTP_FROM)return;mailWorking=true;try{for(const row of db.prepare("SELECT * FROM outbox WHERE state='pending' AND next_try<=? ORDER BY rowid LIMIT 5").all(Date.now())){try{await runPython(path.join(ROOT,'backend/mail.py'),JSON.stringify(mailMessage(row)),{},45000);db.prepare("UPDATE outbox SET state='sent',sent_at=?,last_error='' WHERE id=?").run(new Date().toISOString(),row.id);}catch(error){if(!production)console.error(error.message);const n=row.attempts+1;db.prepare('UPDATE outbox SET attempts=?,state=?,next_try=?,last_error=? WHERE id=?').run(n,n>=5?'failed':'pending',Date.now()+Math.min(3600000,30000*2**n),'Не удалось доставить письмо. Проверьте настройки почты.',row.id);}}}finally{mailWorking=false;}}
+async function flushMail(){
+ if(mailWorking)return;mailWorking=true;
+ try{
+  scheduleReminders();
+  const cfg=notificationConfig();
+  const channels=[...(cfg.emailEnabled?['email']:[]),...(cfg.telegramEnabled?['telegram']:[])];
+  if(!channels.length)return;
+  const rows=db.prepare("SELECT * FROM outbox WHERE state='pending' AND next_try<=? AND channel IN ("+channels.map(()=>'?').join(',')+") ORDER BY kind LIKE 'reminder_%',rowid LIMIT 10").all(Date.now(),...channels);
+  for(const row of rows){
+   const lead=db.prepare('SELECT * FROM leads WHERE id=?').get(row.lead_id);if(!lead)continue;
+   if(!reminderStillRelevant(row,lead)){db.prepare("UPDATE outbox SET state='cancelled' WHERE id=?").run(row.id);continue;}
+   if(row.kind.startsWith('reminder_')){const {hour}=localClock(new Date(),cfg);if(hour<9||hour>=19)continue;}
+   try{
+    if(row.channel==='telegram')await sendTelegram(telegramMessage(row,lead),{...cfg,telegramChat:row.recipient});
+    else await runPython(path.join(ROOT,'backend/mail.py'),JSON.stringify(mailMessage(row)),smtpEnvironment(cfg),45000);
+    db.prepare("UPDATE outbox SET state='sent',sent_at=?,last_error='' WHERE id=?").run(new Date().toISOString(),row.id);
+   }catch{
+    const n=row.attempts+1;
+    db.prepare('UPDATE outbox SET attempts=?,state=?,next_try=?,last_error=? WHERE id=?').run(n,n>=5?'failed':'pending',Date.now()+Math.min(3600000,30000*2**n),row.channel==='telegram'?'Проверьте настройки Telegram и доступ бота к чату.':'Проверьте настройки SMTP и адрес получателя.',row.id);
+   }
+  }
+ }finally{mailWorking=false;}
+}
 async function cleanup(){cleanSession();db.prepare('DELETE FROM events WHERE created<?').run(new Date(Date.now()-90*86400000).toISOString());const stale=db.prepare('SELECT id FROM leads WHERE created<?').all(new Date(Date.now()-180*86400000).toISOString());for(const row of stale){const files=db.prepare('SELECT id FROM files WHERE lead_id=?').all(row.id);transaction(()=>db.prepare('DELETE FROM leads WHERE id=?').run(row.id));for(const f of files)await rm(path.join(DATA,'uploads',f.id),{force:true});}db.prepare('DELETE FROM audit WHERE created<?').run(new Date(Date.now()-365*86400000).toISOString());}
 function stats(days){const since=new Date(Date.now()-days*86400000).toISOString(),get=(sql,...args)=>db.prepare(sql).all(...args);const sessions=db.prepare("SELECT COUNT(DISTINCT session_id) n FROM events WHERE event='page_view' AND created>=?").get(since).n;const stages=['page_view','request_start','step_2','step_3'];const funnel=stages.map(event=>({event,count:db.prepare('SELECT COUNT(DISTINCT session_id) n FROM events WHERE event=? AND created>=?').get(event,since).n}));funnel.push({event:'submitted',count:db.prepare('SELECT COUNT(DISTINCT session_id) n FROM leads WHERE created>=? AND session_id IS NOT NULL').get(since).n});return {days,sessions,leadPages:get("SELECT json_extract(payload,'$.sourcePage') page,COUNT(*) count FROM leads WHERE created>=? GROUP BY page ORDER BY count DESC",since),totalLeads:db.prepare('SELECT COUNT(*) n FROM leads WHERE created>=?').get(since).n,funnel,pages:get("SELECT page,COUNT(*) views,COUNT(DISTINCT session_id) visitors FROM events WHERE event='page_view' AND created>=? GROUP BY page ORDER BY views DESC LIMIT 15",since),services:get("SELECT detail service,COUNT(DISTINCT session_id) visitors FROM events WHERE event='service_interest' AND created>=? GROUP BY detail ORDER BY visitors DESC",since),sources:get("SELECT source,COUNT(DISTINCT session_id) visitors FROM events WHERE event='page_view' AND created>=? GROUP BY source ORDER BY visitors DESC LIMIT 10",since),leadsByDay:get('SELECT substr(created,1,10) day,COUNT(*) count FROM leads WHERE created>=? GROUP BY day ORDER BY day',since)};}
 const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new URL(req.url,origin(req));const route=decodeURIComponent(url.pathname);if(['POST','PUT','DELETE','PATCH'].includes(req.method))sameOrigin(req);if(req.method==='OPTIONS')throw fail(405,'Метод не поддерживается.');
- if(route==='/healthz'){json(res,200,{ok:true});return;}
+ if(route==='/healthz'){json(res,200,{ok:true,version:'6.0.0'});return;}
  if(route==='/api/public/config'&&req.method==='GET'){const s=content().settings;json(res,200,{forms:true,portfolio:true,contact:{email:s.email,phone:s.phone,manager:s.manager},uploads:{count:5,fileBytes:FILE_LIMIT,totalBytes:TOTAL_LIMIT},policyVersion:'2026-09-23'});return;}
+ const selectionMatch=route.match(/^\/selection\/([a-f0-9]{48})(\/pdf)?$/);
+ if(selectionMatch){
+  res.setHeader('X-Robots-Tag','noindex, nofollow');res.setHeader('Referrer-Policy','no-referrer');
+  let selection;try{selection=getShowcase(selectionMatch[1]);}catch(e){if(e.status===410&&!selectionMatch[2]&&['GET','HEAD'].includes(req.method)){res.writeHead(410,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});res.end(req.method==='HEAD'?undefined:closedShowcaseHTML());return;}throw e;}
+  if(!selectionMatch[2]&&['GET','HEAD'].includes(req.method)){const html=showcaseHTML(selection);res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});res.end(req.method==='HEAD'?undefined:html);return;}
+  if(selectionMatch[2]&&req.method==='POST'){
+   if(!rate('portfolio:'+ip(req),12,600000))throw fail(429,'Подождите несколько минут перед новой загрузкой.');
+   const pdf=await createPortfolio({projects:selection.projects,settings:{...selection.settings,manager:selection.manager,phone:selection.phone,email:selection.email},recipient:selection.recipient});
+   res.writeHead(200,{'Content-Type':'application/pdf','Content-Length':pdf.length,'Content-Disposition':disposition('ФАСАД_PRO_подборка.pdf'),'Cache-Control':'no-store'});res.end(pdf);return;
+  }throw fail(405,'Метод не поддерживается.');
+ }
+ const selectionAPI=route.match(/^\/api\/selection\/([a-f0-9]{48})$/);
+ if(selectionAPI&&req.method==='GET'){const selection=getShowcase(selectionAPI[1]);res.setHeader('Referrer-Policy','no-referrer');json(res,200,{title:selection.title,projects:selection.projects.map(p=>p.id)});return;}
  if(route==='/api/portfolio'&&req.method==='POST'){
   if(!rate('portfolio:'+ip(req),12,600000))throw fail(429,'Слишком много подборок. Попробуйте через несколько минут.');
   const input=await jsonBody(req,5000),ids=input.projects;
@@ -60,7 +100,7 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
   if(!rate('lead:'+ip(req),10,3600000))throw fail(429,'Слишком много заявок. Попробуйте позже или позвоните менеджеру.');
   const f=await multipart(req);if(f.get('website'))throw fail(422,'Проверьте форму.');const key=text(f.get('idempotency')||'',80,true);if(!/^[a-f0-9-]{36}$/.test(key))throw fail(422,'Обновите страницу формы.');const p=leadPayload(f),files=await getFiles(f),digest=hash(JSON.stringify(p).replace(/"consentAt":"[^"]+",/,'')+files.map(x=>x.name+hash(x.bytes)).join('|'));const prior=db.prepare('SELECT reference,digest FROM leads WHERE idempotency=?').get(key);if(prior){if(prior.digest!==digest)throw fail(409,'Данные изменились. Обновите форму и повторите отправку.');json(res,200,{reference:prior.reference,received:true});return;}
   const id=randomUUID(),reference='FP-'+new Date().toISOString().slice(0,10).replaceAll('-','')+'-'+randomBytes(4).toString('hex').toUpperCase();const sid=/^[a-f0-9-]{36}$/.test(f.get('analyticsSession')||'')?f.get('analyticsSession'):null;
-  try{for(const file of files)await writeFile(path.join(DATA,'uploads',file.id),file.bytes,{mode:0o600,flag:'wx'});transaction(()=>{db.prepare('INSERT INTO leads(id,reference,created,kind,payload,idempotency,digest,session_id) VALUES(?,?,?,?,?,?,?,?)').run(id,reference,new Date().toISOString(),p.kind,JSON.stringify(p),key,digest,sid);for(const file of files)db.prepare('INSERT INTO files VALUES(?,?,?,?,?)').run(file.id,id,file.name,file.size,file.ext);db.prepare('INSERT INTO outbox(id,lead_id,recipient,kind) VALUES(?,?,?,?)').run(randomUUID(),id,process.env.LEAD_TO||content().settings.email,'manager');if(p.email)db.prepare('INSERT INTO outbox(id,lead_id,recipient,kind) VALUES(?,?,?,?)').run(randomUUID(),id,p.email,'receipt');});}catch(e){for(const file of files)await rm(path.join(DATA,'uploads',file.id),{force:true});throw e;}
+  try{for(const file of files)await writeFile(path.join(DATA,'uploads',file.id),file.bytes,{mode:0o600,flag:'wx'});transaction(()=>{db.prepare('INSERT INTO leads(id,reference,created,kind,payload,idempotency,digest,session_id) VALUES(?,?,?,?,?,?,?,?)').run(id,reference,new Date().toISOString(),p.kind,JSON.stringify(p),key,digest,sid);for(const file of files)db.prepare('INSERT INTO files VALUES(?,?,?,?,?)').run(file.id,id,file.name,file.size,file.ext);db.prepare('INSERT INTO outbox(id,lead_id,recipient,kind) VALUES(?,?,?,?)').run(randomUUID(),id,notificationConfig().leadTo,'manager');if(p.email)db.prepare('INSERT INTO outbox(id,lead_id,recipient,kind) VALUES(?,?,?,?)').run(randomUUID(),id,p.email,'receipt');queueTelegram(id);});}catch(e){for(const file of files)await rm(path.join(DATA,'uploads',file.id),{force:true});throw e;}
   json(res,201,{reference,received:true});void flushMail();return;
  }
  if(route==='/api/events'&&req.method==='POST'){
@@ -71,13 +111,51 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
  }
  if(route.startsWith('/api/admin/')){
   const s=session(req,!['GET','HEAD'].includes(req.method));
-  if(route==='/api/admin/session'&&req.method==='GET'){json(res,200,{username:s.username,csrf:s.csrf,smtpConfigured:Boolean(process.env.SMTP_HOST&&process.env.SMTP_FROM)});return;}
+  if(route==='/api/admin/session'&&req.method==='GET'){json(res,200,{username:s.username,csrf:s.csrf,smtpConfigured:notificationConfig().emailEnabled});return;}
   if(route==='/api/admin/logout'&&req.method==='POST'){db.prepare('DELETE FROM sessions WHERE hash=?').run(s.hash);json(res,200,{ok:true},{'Set-Cookie':'fp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0'+(secureCookie?'; Secure':'')});return;}
   if(route==='/api/admin/password'&&req.method==='POST'){const b=await jsonBody(req,4000);if(!passwordValid(text(b.current,300,true),db.prepare('SELECT password FROM admins WHERE username=?').get(s.username).password))throw fail(422,'Текущий пароль неверен.');const pass=text(b.password,300,true);if(pass.length<14)throw fail(422,'Минимум 14 символов.');db.prepare('UPDATE admins SET password=? WHERE username=?').run(passwordHash(pass),s.username);db.prepare('DELETE FROM sessions WHERE username=? AND hash<>?').run(s.username,s.hash);audit(s.username,'password_changed');json(res,200,{ok:true});return;}
   if(route==='/api/admin/content'&&req.method==='GET'){json(res,200,content());return;}
   if(route==='/api/admin/content'&&req.method==='PUT'){
-   const b=await jsonBody(req),next=validateContent(b);for(const p of next.projects)for(const key of p.images){const file=key.startsWith('media/')?path.join(DATA,key):path.join(site,'assets',key+'.webp');if(!existsSync(file))throw fail(422,'Фотография не найдена. Загрузите её снова.');}
+   const b=await jsonBody(req),next=validateContent(b);for(const key of allContentImages(next)){const file=key.startsWith('media/')?path.join(DATA,key):path.join(site,'assets',key+'.webp');if(!existsSync(file))throw fail(422,'Фотография не найдена. Загрузите её снова.');}
    const task=publishQueue.then(async()=>{const current=content();if(b.revision!==current.revision)throw fail(409,'Сайт изменён в другой вкладке. Обновите данные.');const dir=await render(next),old=activePublic;transaction(()=>{db.prepare('UPDATE content SET revision=revision+1,json=? WHERE id=1').run(JSON.stringify(next));audit(s.username,'content_published');});activePublic=path.join(dir,'public');setTimeout(()=>rm(path.dirname(old),{recursive:true,force:true}).catch(()=>{}),30000).unref();return current.revision+1;});publishQueue=task.catch(()=>{});const revision=await task;json(res,200,{...next,revision});return;
+  }
+  if(route==='/api/admin/preview'&&req.method==='POST'){
+   if(!rate('preview:'+s.username,20,60000))throw fail(429,'Подождите перед следующим предпросмотром.');
+   const b=await jsonBody(req),next=validateContent(b.content),project=next.projects.find(p=>p.id===b.project);
+   if(!project)throw fail(422,'Сначала укажите адрес проекта.');project.published=true;
+   const dir=await render(next);
+   try{const html=await readFile(path.join(dir,'public','projects',project.id+'.html'),'utf8');json(res,200,{html:html.replace('<head>','<head><base href="'+origin(req)+'/projects/">')});}finally{await rm(dir,{recursive:true,force:true});}
+   return;
+  }
+  if(route==='/api/admin/showcases'){
+   if(req.method==='GET'){json(res,200,{rows:listShowcases()});return;}
+   if(req.method==='POST'){const token=saveShowcase(await jsonBody(req,20000));audit(s.username,'showcase_created',token);json(res,201,{token,url:origin(req)+'/selection/'+token});return;}
+  }
+  const shareMatch=route.match(/^\/api\/admin\/showcases\/([a-f0-9]{48})$/);
+  if(shareMatch){
+   if(req.method==='PUT'){saveShowcase(await jsonBody(req,20000),shareMatch[1]);audit(s.username,'showcase_updated',shareMatch[1]);json(res,200,{ok:true});return;}
+   if(req.method==='PATCH'){const b=await jsonBody(req,2000),row=db.prepare('SELECT revision FROM showcases WHERE token=?').get(shareMatch[1]);if(!row)throw fail(404,'Подборка не найдена.');if(b.revision!==row.revision)throw fail(409,'Подборка изменена. Обновите список.');db.prepare('UPDATE showcases SET revoked=?,revision=revision+1 WHERE token=?').run(b.revoked===true?1:0,shareMatch[1]);audit(s.username,'showcase_access_changed',shareMatch[1]);json(res,200,{ok:true});return;}
+  }
+  if(route==='/api/admin/notifications'){
+   if(req.method==='GET'){json(res,200,notificationPublic());return;}
+   if(req.method==='PUT'){const result=saveNotifications(await jsonBody(req,10000));audit(s.username,'notification_settings_saved');json(res,200,result);void flushMail();return;}
+  }
+  if(route==='/api/admin/notifications/test'&&req.method==='POST'){
+   if(!rate('notification-test:'+s.username,10,3600000))throw fail(429,'Не более 10 проверок за час.');
+   const b=await jsonBody(req,1000),c=notificationConfig();
+   try{
+    if(b.channel==='email'){if(!c.emailEnabled)throw fail(422,'Сначала включите и сохраните почту.');await runPython(path.join(ROOT,'backend/mail.py'),JSON.stringify({to:c.leadTo,subject:'ФАСАД.PRO — проверка уведомлений',body:'Почта сайта подключена. Это проверочное сообщение из панели управления.',message_id:'<'+randomUUID()+'@facadepro.ru>'}),smtpEnvironment(c),45000);}
+    else if(b.channel==='telegram'){if(!c.telegramEnabled)throw fail(422,'Сначала включите и сохраните Telegram.');await sendTelegram('ФАСАД.PRO: проверка уведомлений. Новые заявки будут доступны в панели '+origin(req)+'/admin/',c);}
+    else throw fail(422,'Выберите канал уведомлений.');
+   }catch(error){if(error.status)throw error;throw fail(502,'SMTP не принял письмо. Проверьте сервер, порт, пароль и адреса отправителя и получателя.');}
+   audit(s.username,'notification_test',b.channel);json(res,200,{ok:true});return;
+  }
+  if(route==='/api/admin/notifications/chats'&&req.method==='POST'){
+   const c=notificationConfig();if(!c.telegramToken)throw fail(422,'Сначала сохраните токен бота.');
+   if(!rate('telegram-chats:'+s.username,10,60000))throw fail(429,'Повторите через минуту.');
+   const updates=await telegramRequest('getUpdates',{limit:30,timeout:0},c),chats=new Map();
+   for(const u of updates){const chat=u.message?.chat||u.my_chat_member?.chat;if(chat)chats.set(String(chat.id),{id:String(chat.id),title:chat.title||chat.first_name||chat.username||String(chat.id)});}
+   json(res,200,{chats:[...chats.values()]});return;
   }
   if(route==='/api/admin/media'&&req.method==='POST'){const form=await multipart(req,FILE_LIMIT+65536),files=await getFiles(form,true);if(files.length!==1)throw fail(422,'Выберите фотографию.');const f=files[0],ext=f.ext==='jpeg'?'jpg':f.ext,key='media/'+f.id+'.'+ext;await writeFile(path.join(DATA,key),f.bytes,{mode:0o600,flag:'wx'});audit(s.username,'photo_uploaded',key);json(res,201,{key,url:'/'+key});return;}
   if(route==='/api/admin/stats'&&req.method==='GET'){const days=[7,30,90].includes(Number(url.searchParams.get('days')))?Number(url.searchParams.get('days')):30;json(res,200,stats(days));return;}
@@ -86,9 +164,9 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
   if(route==='/api/admin/leads'&&req.method==='GET'){json(res,200,listLeads(url.searchParams,s.username));return;}
   const match=route.match(/^\/api\/admin\/leads\/([a-f0-9-]{36})(\/retry)?$/);
   if(match){const lead=db.prepare('SELECT * FROM leads WHERE id=?').get(match[1]);if(!lead)throw fail(404,'Заявка не найдена.');
-   if(req.method==='GET'){json(res,200,{...lead,payload:JSON.parse(lead.payload),files:db.prepare('SELECT id,name,size FROM files WHERE lead_id=?').all(lead.id),notifications:db.prepare('SELECT id,kind,state,attempts,last_error,sent_at FROM outbox WHERE lead_id=?').all(lead.id)});return;}
+   if(req.method==='GET'){json(res,200,{...lead,payload:JSON.parse(lead.payload),files:db.prepare('SELECT id,name,size FROM files WHERE lead_id=?').all(lead.id),notifications:db.prepare('SELECT id,kind,channel,state,attempts,last_error,sent_at FROM outbox WHERE lead_id=?').all(lead.id)});return;}
    if(req.method==='PATCH'){const b=await jsonBody(req,15000);if(!STATUSES[b.status])throw fail(422,'Выберите статус.');const note=text(b.note||'',10000);if(b.revision!==lead.revision)throw fail(409,'Заявка изменена в другой вкладке. Откройте её заново.');const f=updateFollowup(lead,b);db.prepare('UPDATE leads SET status=?,note=?,assignee=?,next_contact=?,next_action=?,revision=revision+1 WHERE id=?').run(b.status,note,f.assignee,f.nextContact,f.nextAction,lead.id);audit(s.username,'lead_updated',lead.id);json(res,200,{ok:true,revision:lead.revision+1});return;}
-   if(req.method==='POST'&&match[2]){db.prepare("UPDATE outbox SET state='pending',attempts=0,next_try=0,last_error='' WHERE lead_id=? AND state<>'sent'").run(lead.id);audit(s.username,'notification_retry',lead.id);void flushMail();json(res,200,{ok:true});return;}
+   if(req.method==='POST'&&match[2]){db.prepare("UPDATE outbox SET state='pending',attempts=0,next_try=0,last_error='' WHERE lead_id=? AND state IN ('failed','pending')").run(lead.id);audit(s.username,'notification_retry',lead.id);void flushMail();json(res,200,{ok:true});return;}
    if(req.method==='DELETE'){const files=db.prepare('SELECT id FROM files WHERE lead_id=?').all(lead.id);transaction(()=>{db.prepare('DELETE FROM leads WHERE id=?').run(lead.id);audit(s.username,'lead_deleted',lead.id);});for(const f of files)await rm(path.join(DATA,'uploads',f.id),{force:true});json(res,200,{ok:true});return;}
   }
   const fileMatch=route.match(/^\/api\/admin\/files\/([a-f0-9-]{36})$/);if(fileMatch&&req.method==='GET'){const f=db.prepare('SELECT * FROM files WHERE id=?').get(fileMatch[1]);if(!f)throw fail(404,'Файл не найден.');audit(s.username,'file_downloaded',f.lead_id);if(await serveFile(req,res,path.join(DATA,'uploads',f.id),{'Content-Disposition':disposition(f.name),'Content-Type':'application/octet-stream','Cache-Control':'no-store'}))return;throw fail(404,'Файл недоступен.');}

@@ -9,8 +9,8 @@ def js(value):return json.dumps(value,ensure_ascii=False).replace('<','\\u003c')
 def data(path,mime):return 'data:'+mime+';base64,'+base64.b64encode(path.read_bytes()).decode()
 assets={p.name:data(p,'image/svg+xml' if p.suffix=='.svg' else 'image/webp') for p in (site/'assets').iterdir() if p.is_file()}
 downloads={'portfolio.pdf':data(site/'downloads/portfolio.pdf','application/pdf')}
-css='\n'.join((site/name).read_text() for name in ['styles.css','enhancements.css','business.css','release4.css','visual5.css','museum.css','vendor/leaflet/leaflet.css'])
-app='\n'.join((site/name).read_text() for name in ['vendor/leaflet/leaflet.js','app.js','public.js','request.js','release4.js','visual5.js','museum.js'])
+css='\n'.join((site/name).read_text() for name in ['styles.css','enhancements.css','business.css','release4.css','visual5.css','museum.css','release6.css','vendor/leaflet/leaflet.css'])
+app='\n'.join((site/name).read_text() for name in ['vendor/leaflet/leaflet.js','app.js','public.js','request.js','release4.js','visual5.js','museum.js','release6.js'])
 pages={}
 for path in site.rglob('*.html'):
  if path.name.startswith('_') or 'admin' in path.relative_to(site).parts:continue
@@ -26,6 +26,8 @@ script='const ASSETS='+js(assets)+',PAGES='+js(pages)+',CSS='+js(css)+',APP='+js
 html='<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ФАСАД.PRO — предпросмотр</title><style>html,body{margin:0;height:100%;background:#232729}iframe{display:block;width:100%;height:100%;border:0}</style></head><body><iframe title="Сайт ФАСАД.PRO"></iframe><noscript>Для автономного предпросмотра включите JavaScript.</noscript><script>'+script+'</script></body></html>'
 (out/'Фасад_PRO_предпросмотр.html').write_text(html)
 admin=(site/'admin/index.html').read_text();admin=re.sub(r'<link[^>]+>','',admin);admin=re.sub(r'<script[^>]+></script>','',admin)
+admin=re.sub(r'<button[^>]+data-tab="(?:showcases|workflow|notifications)"[^>]*>.*?</button>','',admin)
+admin=admin.replace('id="preview-project"','hidden id="preview-project"')
 admin=admin.replace('src="/assets/logo.svg"','src="'+assets['logo.svg']+'"')
 admin=admin.replace('<a href="/" target="_blank" rel="noopener">Открыть сайт ↗</a>','<span class="muted">Автономная демонстрация</span>')
 admin=admin.replace('<a href="/" target="_blank" rel="noopener"><img','<a href="#" aria-label="ФАСАД.PRO"><img')
@@ -39,8 +41,8 @@ mock=(root/'scripts/admin-demo.js').read_text().replace('DEMO_CONTENT',js(seed))
 appadmin=(site/'admin/admin.js').read_text().replace('Проект сохранён. Страницы сайта обновлены.','Изменения сохранены только в демонстрации.').replace('Сохранено. Контакты обновлены на сайте.','Изменения сохранены только в демонстрации.').replace('Проект удалён с сайта.','Проект удалён только из демонстрации.')
 admin=admin.replace('</body>','<script>'+mock.replace('</script','<\\/script')+'\n'+appadmin.replace('</script','<\\/script')+'</script></body>')
 (out/'Фасад_PRO_панель_демо.html').write_text(admin)
-allowed={'site','source','backend','scripts','tests'}
-rootfiles={'package.json','server.mjs','build.py','site_sections.py','release4.py','visual5.py','museum.py','requirements.txt','THIRD_PARTY.md','package-preview.py','Dockerfile','compose.yaml','nginx.conf','.dockerignore','.gitignore','.env.example','README.md','DEPLOY.md'}
+allowed={'site','source','backend','scripts','tests','deploy'}
+rootfiles={'package.json','server.mjs','build.py','site_sections.py','release4.py','visual5.py','museum.py','release6.py','requirements.txt','THIRD_PARTY.md','package-preview.py','Dockerfile','compose.yaml','nginx.conf','.dockerignore','.gitignore','.env.example','README.md','DEPLOY.md'}
 with zipfile.ZipFile(out/'Фасад_PRO_сайт_Timeweb.zip','w',zipfile.ZIP_DEFLATED) as z:
  for path in sorted(root.rglob('*')):
   rel=path.relative_to(root)

@@ -27,13 +27,14 @@
   function show(next) {
     index = (next + active.length) % active.length;
     const data = active[index].dataset;
-    photo.src = window.facadeAsset ? window.facadeAsset(data.reportPhoto) : `../assets/${data.reportPhoto}.webp`;
+    photo.src = window.facadeAsset ? window.facadeAsset(data.reportPhoto) : active[index].href;
     photo.alt = data.caption;
     viewer.querySelector('#report-viewer-title').textContent = `${data.period} · ${index + 1} / ${active.length}`;
     viewer.querySelector('.report-viewer-caption').textContent = data.caption;
     const source = viewer.querySelector('.report-viewer-source');
-    source.href = data.source;
-    source.textContent = `Фото: ${data.credit} · публикация ${data.publication} ↗`;
+    source.hidden = !data.source;
+    source.href = data.source || '#';
+    source.textContent = `Фото: ${data.credit} · ${data.dateKind || "Публикация"} ${data.publication} ↗`;
     viewer.querySelectorAll('[data-report-step]').forEach(button => { button.hidden = active.length < 2; });
   }
   links.forEach(link => link.addEventListener('click', event => {

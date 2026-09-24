@@ -1,3 +1,4 @@
+import {upgradeContent,validateExtras,validateWorkflow} from './content6.mjs';
 import {DatabaseSync} from 'node:sqlite';
 import {mkdirSync,readFileSync,writeFileSync,existsSync} from 'node:fs';
 import path from 'node:path';
@@ -34,7 +35,7 @@ export const hash=x=>createHash('sha256').update(x).digest('hex');
 export const privateHash=x=>createHmac('sha256',secret).update(x).digest('hex');
 export function passwordHash(password){const salt=randomBytes(16).toString('hex');return salt+':'+scryptSync(password,salt,64).toString('hex');}
 export function passwordValid(password,stored){try{const [salt,digest]=stored.split(':');return timingSafeEqual(scryptSync(password,salt,64),Buffer.from(digest,'hex'));}catch{return false;}}
-export function content(){const row=db.prepare('SELECT * FROM content WHERE id=1').get(),value=JSON.parse(row.json);value.projects=value.projects.map(p=>{const seed=seedContent.projects.find(x=>x.id===p.id);return {...p,serviceIds:p.serviceIds??seed?.serviceIds??[],geo:p.geo===undefined&&(p.location===seed?.location)?seed.geo:p.geo??null};});return {revision:row.revision,...value};}
+export function content(){const row=db.prepare('SELECT * FROM content WHERE id=1').get(),value=JSON.parse(row.json);value.projects=value.projects.map(p=>{const seed=seedContent.projects.find(x=>x.id===p.id);return {...p,serviceIds:p.serviceIds??seed?.serviceIds??[],geo:p.geo===undefined&&(p.location===seed?.location)?seed.geo:p.geo??null};});return {revision:row.revision,...upgradeContent(value)};}
 export function audit(user,action,target=''){db.prepare('INSERT INTO audit(created,username,action,target) VALUES(?,?,?,?)').run(new Date().toISOString(),user,action,target);}
 export function rate(key,max,windowMs){const now=Date.now(),k=privateHash(key);let row=db.prepare('SELECT * FROM rate_limits WHERE key=?').get(k);if(!row||row.expires<=now){db.prepare('INSERT OR REPLACE INTO rate_limits VALUES(?,1,?)').run(k,now+windowMs);return true;}if(row.count>=max)return false;db.prepare('UPDATE rate_limits SET count=count+1 WHERE key=?').run(k);return true;}
 export function cleanSession(){db.prepare('DELETE FROM sessions WHERE expires<?').run(Date.now());db.prepare('DELETE FROM rate_limits WHERE expires<?').run(Date.now());}
@@ -59,8 +60,11 @@ export function validateContent(input){
   out.geo=null;if(p.geo!==undefined&&p.geo!==null){const g=p.geo;if(typeof g.lat!=='number'||typeof g.lng!=='number'||!Number.isFinite(g.lat)||!Number.isFinite(g.lng)||Math.abs(g.lat)>90||Math.abs(g.lng)>180||!['city','exact'].includes(g.precision))throw fail(422,'Проверьте координаты и точность отметки.');out.geo={lat:g.lat,lng:g.lng,label:text(g.label,100,true),precision:g.precision};}
   if(!Array.isArray(p.images)||p.images.length<1||p.images.length>12||p.images.some(x=>!/^([a-z0-9-]+|media\/[a-f0-9-]+\.(png|jpg|webp))$/.test(x)))throw fail(422,'Добавьте от 1 до 12 фотографий.');
   out.images=p.images;out.case={};for(const key of ['task','challenge','solution','result'])out.case[key]=text(p.case?.[key]||'',2500);
+  Object.assign(out,validateExtras(p));
   return out;
  });
  if(!projects.some(p=>p.published))throw fail(422,'Оставьте хотя бы один опубликованный проект.');
- return {settings,projects};
+ const workflow=validateWorkflow(input.workflow);
+ for(const row of workflow){const project=projects.find(p=>p.id===row.project);if(!project||!project.images.includes(row.image))throw fail(422,'Фотография этапа должна принадлежать выбранному проекту.');}
+ return {schemaVersion:6,settings,projects,workflow};
 }
