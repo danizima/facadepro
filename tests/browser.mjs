@@ -8,6 +8,7 @@ import {verifyRelease8} from './browser8.mjs';
 import {verifyRelease9} from './browser9.mjs';
 import {verifyRelease10} from './browser10.mjs';
 import {verifyRelease102} from './browser102.mjs';
+import {verifyRelease103} from './browser103.mjs';
 const require=createRequire(import.meta.url),{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=new URL('../',import.meta.url).pathname,data=await mkdtemp(path.join(tmpdir(),'facadepro-browser-')),base='http://127.0.0.1:18746',shots=path.join(root,'artifacts/browser');await mkdir(shots,{recursive:true});
 const env={...process.env,DATA_DIR:data,PORT:'18746',PUBLIC_URL:base,NODE_ENV:'test',SMTP_HOST:'',SMTP_FROM:'',TELEGRAM_BOT_TOKEN:'',TELEGRAM_CHAT_ID:''};
@@ -22,7 +23,7 @@ try{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{try{localStorage.setItem('facade_statistics','no');}catch{}});
  await page.goto(base+'/',{waitUntil:'networkidle'});await page.screenshot({path:path.join(shots,'home-desktop.png')});
- await page.locator('[data-audience="owner"]').click();assert.equal(await page.locator('[data-audience-panel="owner"]').isVisible(),true);
+ await page.goto(base+'/about.html',{waitUntil:'networkidle'});await page.locator('[data-audience="owner"]').click();assert.equal(await page.locator('[data-audience-panel="owner"]').isVisible(),true);await page.goto(base+'/',{waitUntil:'networkidle'});
  await page.locator('.callback-section').screenshot({path:path.join(shots,'callback-desktop.png')});
  await page.locator('.callback-form [name=name]').fill('Проверка браузером');await page.locator('.callback-form [name=phone]').fill('+7 999 000 00 00');await page.locator('.callback-form [name=preferredTime]').fill('После 14:00, Москва');await page.locator('.callback-form [name=consent]').check();await page.locator('.callback-form [type=submit]').click();await page.locator('.callback-status').filter({hasText:'получен'}).waitFor();
  await page.goto(base+'/compare.html',{waitUntil:'networkidle'});await page.locator('#compare-picker [value=museum]').check();await page.locator('#compare-picker [value=burny]').check();await page.locator('.compare-table').waitFor();assert.equal(await page.locator('.compare-table thead th').count(),3);await page.locator('#compare-picker [value=restaurant]').check();assert.equal(await page.locator('#compare-picker [value=brusnika]').isDisabled(),true);
@@ -35,11 +36,12 @@ try{
  await page.locator('[data-tab=projects]').click();await page.locator('[data-project-edit=museum]').click();await page.locator('#preview-project').click();await page.locator('#preview-dialog').waitFor({state:'visible'});await page.frameLocator('#preview-frame').locator('h1').waitFor();await page.locator('#close-preview').click();await page.locator('#close-project').click();
  await page.locator('[data-tab=materials]').click();await page.locator('#add-material').click();await page.locator('#materials-form [data-field=title]').fill('Проверка отзыва');await page.locator('#materials-form [data-field=text]').fill('Тестовая запись для проверки интерфейса.');await page.locator('#materials-form [data-field=author]').fill('Тестовый автор');await page.locator('#materials-form [type=submit]').click();await page.locator('#admin-status').filter({hasText:'Материалы сохранены'}).waitFor();
  await page.locator('[data-tab=showcases]').click();await page.locator('#new-showcase').click();await page.locator('[data-select-project=museum]').check();await page.locator('[data-select-project=restaurant]').check();await page.locator('#share-form [type=submit]').click();await page.locator('.showcase-list article').waitFor();
- await page.locator('[data-tab=notifications]').click();await page.locator('#notifications-form').waitFor();await page.locator('#notifications-form [type=submit]').click();await page.locator('#admin-status').filter({hasText:'Настройки сохранены'}).waitFor();
+ await page.locator('[data-tab=notifications]').click();await page.locator('#notifications-form').waitFor();await page.locator('#notifications-form [type=submit]:not([data-email-connect])').click();await page.locator('#admin-status').filter({hasText:'Настройки сохранены'}).waitFor();
  await verifyRelease8({page,base,shots});
  await verifyRelease9({page,base,shots});
  await verifyRelease10({page,base,shots});
  await verifyRelease102({page,base,shots});
+ await verifyRelease103({page,base,shots});
  for(const width of [390,320]){
   await page.setViewportSize({width,height:844});
   for(const route of ['/', '/compare.html?projects=museum,burny','/projects/museum.html','/request.html','/admin/']){

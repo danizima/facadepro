@@ -15,7 +15,7 @@ export function notificationConfig(){
 }
 export function notificationPublic(){
  const c=notificationConfig(),{smtpPassword,telegramToken,...safe}=c;
- return {...safe,hasPassword:Boolean(smtpPassword),hasToken:Boolean(telegramToken),queue:db.prepare('SELECT channel,state,COUNT(*) count FROM outbox GROUP BY channel,state').all()};
+ return {...safe,timewebPreset:{smtpHost:'smtp.timeweb.ru',smtpPort:465,smtpSecurity:'tls',smtpFrom:'office@facadepro.ru',smtpUser:'office@facadepro.ru',leadTo:'office@facadepro.ru'},hasPassword:Boolean(smtpPassword),hasToken:Boolean(telegramToken),queue:db.prepare('SELECT channel,state,COUNT(*) count FROM outbox GROUP BY channel,state').all()};
 }
 export function saveNotifications(b){
  const old=notificationConfig();if(b.revision!==old.revision)throw fail(409,'Настройки изменены в другой вкладке. Обновите раздел.');

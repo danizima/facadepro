@@ -1,7 +1,7 @@
 """Generate the static site from portfolio data. Python 3, standard library only."""
 from pathlib import Path
 import json, re, html, urllib.parse, os
-import release4, visual5, release6, release7, release8, release9, assets9, visual10
+import release4, visual5, release6, release7, release8, release9, assets9, visual10, release103
 ROOT=Path(__file__).resolve().parent
 VERSION=json.loads((ROOT/'package.json').read_text())['version']
 OUT=Path(os.environ.get('FACADE_OUTPUT',str(ROOT/'site')))
@@ -12,6 +12,7 @@ P=[p for p in CONTENT['projects'] if p.get('published',True)]
 CFG=CONTENT['settings']
 S=json.loads((ROOT/'source/services.json').read_text())
 IMAGE_SIZES=json.loads((ROOT/'source/image-sizes.json').read_text())
+PHOTO_FOCUS=json.loads((ROOT/'source/photo-focus.json').read_text())
 old=(ROOT/'source/home-v1.html').read_text()
 class SafeHTML(str): pass
 def e(v,quote=True): return v if isinstance(v,SafeHTML) else html.escape(str(v),quote=quote)
@@ -34,7 +35,9 @@ def img(key,alt,base='',eager=False,sizes=None,full=False):
  small_width=IMAGE_SIZES.get(key+'-small',[520])[0]
  if not full and not key.startswith('media/') and (ROOT/'site/assets'/f'{key}-small.webp').is_file() and IMAGE_SIZES.get(key+'-small',[520])[0]<width:
   responsive=f' srcset="{base}assets/{key}-small.webp {small_width}w, {url} {width}w" sizes="{sizes}"' if not eager or sizes else ''
- return f'<img{responsive} src="{url}" alt="{e(alt)}" width="{width}" height="{height}" loading="{"eager" if eager else "lazy"}" decoding="async"{priority}>' 
+ focus=PHOTO_FOCUS.get(key,[50,50])
+ attrs=f' data-photo="{e(key)}" style="--photo-mobile:{focus[0]}% {focus[1]}%"'
+ return f'<img{attrs}{responsive} src="{url}" alt="{e(alt)}" width="{width}" height="{height}" loading="{"eager" if eager else "lazy"}" decoding="async"{priority}>' 
 def button(label,href,light=False):
  return f'<a class="button {"button-light" if light else ""}" href="{href}">{label}{ARROW}</a>'
 def header(base,active):
@@ -45,6 +48,7 @@ def page(path,title,desc,body,active='',extra=''):
  body=release9.enhance(globals(),path,body)
  body=release8.enhance(globals(),path,body)
  body=visual10.enhance(globals(),path,body)
+ body=release103.enhance(globals(),path,body)
  if path in ['index.html','about.html']: body+=release7.materials(globals())
  if path in ['index.html','contacts.html']:body+=release7.callback(globals())
  if path.startswith('projects/') and path.endswith('.html'):body+=release7.materials(globals(),path.split('/')[-1][:-5])
@@ -78,7 +82,7 @@ def faqblock():
 home=re.search(r'<main id="main">(.*?)</main>',old,re.S).group(1)
 home=home.replace('<div class="company-footnote">', '<a class="text-button company-link" href="about.html">Подробнее о команде '+ARROW+'</a><div class="company-footnote">')
 home=release6.home(globals(),visual5.home(globals(),home))
-page('index.html','Фасадные работы и сложное остекление','Фасадное остекление, оконные системы, ремонт и восстановление фасадов. 180 монтажников, 63 собственных подъёмника. Работаем по всей России.',home+faqblock())
+page('index.html','Фасадные работы и сложное остекление','Фасадное остекление, оконные системы, ремонт и восстановление фасадов. 180 монтажников, 63 собственных подъёмника. Работаем по всей России.',release103.home(globals(),home)+faqblock())
 filters=[('all','Все проекты',len(P))]+[(key,label,sum(CATEGORIES[p['type']]==key for p in P)) for key,label in [('housing','Жилые комплексы'),('hotels','Гостиницы'),('culture','Культура'),('construction','Строительство'),('public','Общественные объекты')]]
 controls=f'<div class="catalog-tools js-only"><div class="filter-list" role="group" aria-label="Тип объекта">'+''.join(f'<button class="filter-button" data-filter="{key}" aria-pressed="{str(key=="all").lower()}">{label}<span>{count}</span></button>' for key,label,count in filters)+'</div><label class="search-field"><span>Поиск по проектам</span><input id="project-search" type="search" placeholder="Название, адрес или вид работ" autocomplete="off"></label><div class="catalog-status"><p id="results-count" role="status" aria-live="polite">Показано проектов: '+str(len(P))+'</p><button class="text-button" id="reset-filters" type="button" hidden>Сбросить фильтры ×</button></div></div>'
 page('projects.html','Проекты',f'{len(P)} проектов ФАСАД.PRO: жилые комплексы, гостиницы, культурная инфраструктура и строительство.',intro(f'Портфолио / {len(P)} объектов','Работа, которую<br>можно увидеть.','От оконных систем жилых кварталов до сложной геометрии общественных зданий.')+'<section class="section catalog-section" aria-label="Каталог проектов">'+controls.replace('<div class="catalog-status">',release8.catalog_filters(globals())+'<div class="catalog-status">')+'<div class="project-grid catalog-grid editorial-grid">'+''.join(card(p,catalog=True,slot=i%4) for i,p in enumerate(P))+'</div><div class="empty-state" id="empty-results" hidden><h2>Проектов не найдено</h2><p>Попробуйте другое название или сбросьте фильтры.</p><button type="button" class="button" data-reset-filters>Показать все проекты</button></div></section>'+strip('У вас похожая задача?','Расскажите об объекте — обсудим подход к работам.'),'projects')
@@ -110,6 +114,7 @@ extra_pages(globals())
 release4.pages(globals())
 release7.compare(globals())
 release9.pages(globals())
+release103.photo_page(globals())
 page('404.html','Страница не найдена','Вернуться на сайт ФАСАД.PRO.',intro('404','Страница<br>не найдена.','Возможно, адрес изменился. Перейдите на главную или откройте каталог проектов.')+'<div class="section error-actions">'+button('На главную','index.html')+button('Смотреть проекты','projects.html')+'</div>')
 (OUT/'favicon.svg').write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#252525"/><path d="M7 26V6h18M7 16h15" fill="none" stroke="white" stroke-width="4"/></svg>')
 (OUT/'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+''.join('<url><loc>https://facadepro.ru/'+('' if x=='index.html' else x)+'</loc></url>' for x in pages if x!='404.html')+'</urlset>')
