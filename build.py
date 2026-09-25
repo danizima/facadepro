@@ -1,7 +1,7 @@
 """Generate the static site from portfolio data. Python 3, standard library only."""
 from pathlib import Path
 import json, re, html, urllib.parse, os
-import release4, visual5, release6, release7, release8, release9, assets9, visual10, release103
+import release4, visual5, release6, release7, release8, release9, assets9, visual10, release103, release11
 ROOT=Path(__file__).resolve().parent
 VERSION=json.loads((ROOT/'package.json').read_text())['version']
 OUT=Path(os.environ.get('FACADE_OUTPUT',str(ROOT/'site')))
@@ -12,6 +12,7 @@ P=[p for p in CONTENT['projects'] if p.get('published',True)]
 CFG=CONTENT['settings']
 S=json.loads((ROOT/'source/services.json').read_text())
 IMAGE_SIZES=json.loads((ROOT/'source/image-sizes.json').read_text())
+PHOTO_SOURCES=json.loads((ROOT/'source/photo-sources.json').read_text())
 PHOTO_FOCUS=json.loads((ROOT/'source/photo-focus.json').read_text())
 old=(ROOT/'source/home-v1.html').read_text()
 class SafeHTML(str): pass
@@ -49,6 +50,7 @@ def page(path,title,desc,body,active='',extra=''):
  body=release8.enhance(globals(),path,body)
  body=visual10.enhance(globals(),path,body)
  body=release103.enhance(globals(),path,body)
+ body=release11.enhance(globals(),path,body)
  if path in ['index.html','about.html']: body+=release7.materials(globals())
  if path in ['index.html','contacts.html']:body+=release7.callback(globals())
  if path.startswith('projects/') and path.endswith('.html'):body+=release7.materials(globals(),path.split('/')[-1][:-5])
@@ -58,7 +60,7 @@ def page(path,title,desc,body,active='',extra=''):
  if path in ['projects.html','map.html','portfolio.html','compare.html']:
   body='<nav class="project-subnav" aria-label="Портфолио">'+''.join(f'<a href="{u}"'+(' aria-current="page"' if path==u else '')+f'>{t}</a>' for u,t in [('projects.html','Каталог'),('map.html','Карта проектов'),('portfolio.html','Собрать PDF'),('compare.html','Сравнить')])+'</nav>'+body
  seo={'@context':'https://schema.org','@type':'Organization','name':'ФАСАД.PRO','legalName':CFG['legalName'],'url':'https://facadepro.ru/','telephone':CFG['phone'],'email':CFG['email']}
- content=f'''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#252525"><title>{e(title)} — ФАСАД.PRO</title><meta name="description" content="{e(desc)}"><link rel="canonical" href="{url}"><meta property="og:type" content="website"><meta property="og:locale" content="ru_RU"><meta property="og:title" content="{e(title)} — ФАСАД.PRO"><meta property="og:description" content="{e(desc)}"><meta property="og:url" content="{url}"><meta property="og:image" content="https://facadepro.ru/assets/museum.webp"><link rel="icon" href="{base}favicon.svg" type="image/svg+xml">{map_assets}<script type="application/ld+json">{json.dumps(seo,ensure_ascii=False).replace(chr(60),chr(92)+'u003c')}</script>{assets9.assets(globals(),path,body+extra,base)}</head><body data-base="{base}">{header(base,active)}<main id="main">{body}</main>{footer(base)}{visual5.mobile_actions(globals(),base,path)}{extra}<noscript><style>.js-only{{display:none!important}}.menu-toggle{{display:none}}@media(max-width:1100px){{.navigation{{display:flex!important;position:static;flex-wrap:wrap;background:transparent;padding:16px 0;height:auto!important;max-height:none!important}}.header-inner{{flex-wrap:wrap}}.nav-extras{{display:none!important}}.nav-primary{{display:flex;flex-wrap:wrap;gap:0 16px}}.navigation a{{font-size:16px;padding:8px}}}}</style></noscript></body></html>'''
+ content=f'''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#252525"><title>{e(title)} — ФАСАД.PRO</title><meta name="description" content="{e(desc)}"><link rel="canonical" href="{url}"><meta property="og:type" content="website"><meta property="og:locale" content="ru_RU"><meta property="og:title" content="{e(title)} — ФАСАД.PRO"><meta property="og:description" content="{e(desc)}"><meta property="og:url" content="{url}"><meta property="og:image" content="https://facadepro.ru/assets/museum.webp"><link rel="icon" href="{base}favicon.svg" type="image/svg+xml">{map_assets}<script type="application/ld+json">{json.dumps(seo,ensure_ascii=False).replace(chr(60),chr(92)+'u003c')}</script>{assets9.assets(globals(),path,body+extra,base)}</head><body data-base="{base}" data-page="{path}">{header(base,active)}<main id="main">{body}</main>{footer(base)}{visual5.mobile_actions(globals(),base,path)}{extra}{release11.contact(globals(),base,path)}<noscript><style>.js-only{{display:none!important}}.menu-toggle{{display:none}}@media(max-width:1100px){{.navigation{{display:flex!important;position:static;flex-wrap:wrap;background:transparent;padding:16px 0;height:auto!important;max-height:none!important}}.header-inner{{flex-wrap:wrap}}.nav-extras{{display:none!important}}.nav-primary{{display:flex;flex-wrap:wrap;gap:0 16px}}.navigation a{{font-size:16px;padding:8px}}}}</style></noscript></body></html>'''
  if path=='contacts.html':
   for oldv,newv in [('Надежда Лизогубова',CFG['manager']),('ООО «Мастер Склад Владивосток»',CFG['legalName']),('2543104214',CFG['inn']),('254301001',CFG['kpp'])]:
    content=content.replace(oldv,e(newv))

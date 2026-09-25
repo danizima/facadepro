@@ -2,7 +2,7 @@
 import hashlib
 from pathlib import Path
 
-CSS=['styles.css','enhancements.css','business.css','release4.css','visual5.css','museum.css','release6.css','release7.css','release8.css','release9.css','visual10.css','release103.css']
+CSS=['styles.css','enhancements.css','business.css','release4.css','visual5.css','museum.css','release6.css','release7.css','release8.css','release9.css','visual10.css','release103.css','release11.css']
 
 
 def write_bundle(g,names,extension):
@@ -15,7 +15,7 @@ def write_bundle(g,names,extension):
 
 
 def assets(g,route,body,base):
-    scripts=['app.js','public.js']
+    scripts=['app.js','public.js','release11.js']
     if 'id="request-form"' in body:scripts.append('request.js')
     if route in ('map.html','solutions.html','portfolio.html'):scripts.append('release4.js')
     scripts.append('visual5.js')

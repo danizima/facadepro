@@ -122,4 +122,4 @@ def mobile_actions(g, base, path):
     if path in ['request.html','photo-request.html','quote.html','portfolio.html','kit.html','updates.html']:
         return ''
     phone = re.sub(r'[^+0-9]', '', g['CFG']['phone'])
-    return f'<nav class="mobile-actions" aria-label="Быстрая связь"><a href="tel:{phone}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m7 3 3 5-2 2c1.5 3 3 4.5 6 6l2-2 5 3-1 4C11 22 2 13 3 4Z"/></svg>Позвонить</a><a href="{base}request.html">Обсудить объект {g["ARROW"]}</a></nav>'
+    return f'<nav class="mobile-actions" aria-label="Быстрая связь"><a href="tel:{phone}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m7 3 3 5-2 2c1.5 3 3 4.5 6 6l2-2 5 3-1 4C11 22 2 13 3 4Z"/></svg>Позвонить</a><a data-contact-open href="{base}request.html">Связаться {g["ARROW"]}</a></nav>'

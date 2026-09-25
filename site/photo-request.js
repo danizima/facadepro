@@ -5,6 +5,8 @@
   const fieldset=form.querySelector('fieldset'),status=document.querySelector('#photo-send-status'),fileStatus=document.querySelector('#photo-file-status');
   const chooser=document.querySelector('#photo-files'),camera=document.querySelector('#photo-camera'),preview=document.querySelector('#photo-previews');
   const success=document.querySelector('#photo-success'),total=document.querySelector('#photo-total'),drop=document.querySelector('#photo-drop');
+  const project=JSON.parse(document.querySelector('#photo-projects')?.textContent||'[]').find(p=>p.id===new URLSearchParams(location.search).get('project'));
+  if(project){const context=document.querySelector('#photo-project-context');context.hidden=false;context.textContent='Интересует похожий объект: '+project.title;}
   const limits={count:5,fileBytes:10*1024*1024,totalBytes:25*1024*1024};
   let photos=[],busy=false,ready=false,key=window.facade.uuid();
   const size=bytes=>(bytes/1024/1024).toLocaleString('ru',{maximumFractionDigits:1})+' МБ';
@@ -47,6 +49,7 @@
     const phone=form.elements.phone.value;
     if(!/^[+\d\s().-]+$/.test(phone)||phone.replace(/\D/g,'').length<7||phone.replace(/\D/g,'').length>15){status.textContent='Проверьте номер телефона.';form.elements.phone.focus();return;}
     const payload=new FormData(form);payload.set('consent','yes');payload.set('idempotency',key);payload.set('sourcePage',window.facade.attribution());payload.set('analyticsSession',window.facade.getSession());
+    if(project)payload.set('project',project.id);
     photos.forEach(row=>payload.append('files',row.file,row.file.name));
     busy=true;fieldset.disabled=true;status.textContent='Отправляем фотографии…';
     try{

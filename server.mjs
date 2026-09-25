@@ -65,7 +65,9 @@ function photoPayload(f){
  if(!/^[+\d\s().-]+$/.test(phone)||phone.replace(/\D/g,'').length<7||phone.replace(/\D/g,'').length>15)throw fail(422,'Проверьте номер телефона.');
  if(email&&!emailOK(email))throw fail(422,'Проверьте email.');
  if(f.get('consent')!=='yes')throw fail(422,'Подтвердите согласие на обработку данных.');
- return {kind:'photo',services:[],object:'Обращение с фотографиями',city:text(f.get('city')||'',120)||'Не указан',timing:'Уточнить',name:text(f.get('name')||'',100)||'Не указано',phone,email,company:'',comment:text(f.get('comment')||'',1500),comparedProjects:[],consentAt:new Date().toISOString(),policyVersion:'2026-09-23',sourcePage:cleanPage(text(f.get('sourcePage')||'/photo-request.html',150))};
+ const project=text(f.get('project')||'',80);
+ if(project&&!content().projects.some(p=>p.id===project&&p.published!==false))throw fail(422,'Выбранный проект недоступен. Обновите страницу формы.');
+ return {kind:'photo',services:[],object:'Обращение с фотографиями',city:text(f.get('city')||'',120)||'Не указан',timing:'Уточнить',name:text(f.get('name')||'',100)||'Не указано',phone,email,company:'',comment:text(f.get('comment')||'',1500),comparedProjects:comparedProjects(project),consentAt:new Date().toISOString(),policyVersion:'2026-09-23',sourcePage:cleanPage(text(f.get('sourcePage')||'/photo-request.html',150))};
 }
 async function materialFile(req,res,key){
  if(!/^materials\/[a-f0-9-]{36}\.(pdf|mp4|webm)$/.test(key))throw fail(404,'Файл не найден.');
@@ -180,8 +182,8 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
    try{
     let html=await readFile(path.join(dir,'public','projects',project.id+'.html'),'utf8');
     // Draft previews can require a script combination absent from published pages.
-    const css=['styles','enhancements','business','release4','visual5','museum','release6','release7','release8','release9','visual10','release103'];
-    const js=['app','public','request','release4','visual5','museum','release6','release7','release8','release9','visual10'];
+    const css=['styles','enhancements','business','release4','visual5','museum','release6','release7','release8','release9','visual10','release103','release11'];
+    const js=['app','public','request','release4','visual5','museum','release6','release7','release8','release9','visual10','release11'];
     html=html.replace(/<link rel="stylesheet" href="[^"]*bundles\/site-[a-f0-9]+\.css">/,css.map(n=>'<link rel="stylesheet" href="/'+n+'.css">').join(''));
     html=html.replace(/<script src="[^"]*bundles\/page-[a-f0-9]+\.js" defer><\/script>/,js.map(n=>'<script src="/'+n+'.js" defer></script>').join(''));
     json(res,200,{html:html.replace('<head>','<head><base href="'+origin(req)+'/projects/">')});

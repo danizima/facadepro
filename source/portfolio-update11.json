@@ -1,0 +1,65 @@
+{
+  "id": "visual-portfolio-11",
+  "updates": [
+    {
+      "id": "museum",
+      "fields": [
+        {
+          "path": [
+            "images"
+          ],
+          "before": [
+            "museum",
+            "museum-detail",
+            "museum-facade"
+          ],
+          "after": [
+            "museum-glass-2026",
+            "museum-roof-2026",
+            "museum-geometry-2026",
+            "museum-vertical-2026",
+            "museum",
+            "museum-detail",
+            "museum-facade"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "burny",
+      "fields": [
+        {
+          "path": [
+            "images"
+          ],
+          "before": [
+            "burny"
+          ],
+          "after": [
+            "burny-evening",
+            "burny-promenade",
+            "burny"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "meridiany",
+      "fields": [
+        {
+          "path": [
+            "images"
+          ],
+          "before": [
+            "meridiany"
+          ],
+          "after": [
+            "meridiany-facade",
+            "meridiany"
+          ]
+        }
+      ]
+    }
+  ],
+  "additions": []
+}

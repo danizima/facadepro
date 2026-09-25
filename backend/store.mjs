@@ -34,6 +34,7 @@ db.exec('CREATE INDEX IF NOT EXISTS leads_followup ON leads(next_contact,status,
 const seedContent=JSON.parse(readFileSync(path.join(ROOT,'source/content.json'),'utf8'));
 if(!db.prepare('SELECT id FROM content WHERE id=1').get())db.prepare('INSERT INTO content VALUES(1,1,?)').run(readFileSync(path.join(ROOT,'source/content.json'),'utf8'));
 applyPortfolioUpdate(db,JSON.parse(readFileSync(path.join(ROOT,'source/portfolio-update10-2.json'),'utf8')));
+applyPortfolioUpdate(db,JSON.parse(readFileSync(path.join(ROOT,'source/portfolio-update11.json'),'utf8')));
 export const hash=x=>createHash('sha256').update(x).digest('hex');
 export const privateHash=x=>createHmac('sha256',secret).update(x).digest('hex');
 export function passwordHash(password){const salt=randomBytes(16).toString('hex');return salt+':'+scryptSync(password,salt,64).toString('hex');}

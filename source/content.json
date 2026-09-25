@@ -21,6 +21,10 @@
       "work": "Монтаж светопрозрачных алюминиевых конструкций на объекте со сложной архитектурной геометрией.",
       "client": "ООО «ТГ Мастер Билл»",
       "images": [
+        "museum-glass-2026",
+        "museum-roof-2026",
+        "museum-geometry-2026",
+        "museum-vertical-2026",
         "museum",
         "museum-detail",
         "museum-facade"
@@ -52,6 +56,8 @@
       "volume": "Ремонт фасада",
       "work": "Ремонт и восстановление алюминиевого фасада. Монтаж светопрозрачных перегородок.",
       "images": [
+        "burny-evening",
+        "burny-promenade",
         "burny"
       ],
       "published": true,
@@ -241,6 +247,7 @@
       "work": "Монтаж оконных блоков из ПВХ-профилей в домах №1, №2 и №3 первого этапа строительства жилого комплекса.",
       "client": "ООО «КСК-Строй»",
       "images": [
+        "meridiany-facade",
         "meridiany"
       ],
       "published": true,

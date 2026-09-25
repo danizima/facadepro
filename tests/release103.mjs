@@ -31,7 +31,7 @@ async function call(route,{method='GET',body,auth=false,form=false,origin=base}=
 }
 async function ok(response,status=200){assert.equal(response.status,status,await response.clone().text());return response.json();}
 const bytes=await readFile(path.join(root,'site/assets/museum-small.webp'));
-const payload={phone:'+7 999 000 00 00',email:'customer@example.com',comment:'PHOTO-INTEGRATION-TEST',consent:'yes',website:'',idempotency:randomUUID(),sourcePage:'/projects/museum.html'};
+const payload={phone:'+7 999 000 00 00',email:'customer@example.com',comment:'PHOTO-INTEGRATION-TEST',consent:'yes',website:'',idempotency:randomUUID(),sourcePage:'/projects/museum.html',project:'museum'};
 function photo(overrides={},files=[{bytes,name:'Фасад.webp'}]){const form=new FormData();for(const [key,value] of Object.entries({...payload,...overrides}))form.set(key,value);for(const file of files)form.append('files',new Blob([file.bytes]),file.name);return form;}
 const submit=(body,options={})=>call('/api/photo-request',{method:'POST',body,form:true,...options});
 try{
@@ -45,9 +45,10 @@ try{
   assert.equal((await submit(photo({},[{bytes:Buffer.from('%PDF-1.4'),name:'plan.pdf'}]))).status,422,'only photos');
   assert.equal((await submit(photo({},[{bytes:Buffer.from('<script>bad</script>'),name:'fake.webp'}]))).status,422,'validate signatures');
   assert.equal((await submit(photo({},Array.from({length:6},(_,i)=>({bytes,name:i+'.webp'}))))).status,422,'file count');
+  assert.equal((await submit(photo({project:'not-a-project'}))).status,422,'unpublished or invalid project rejected');
   const first=await ok(await submit(photo()),201),again=await ok(await submit(photo()));assert.equal(first.reference,again.reference,'retry reuses the receipt');
   assert.equal((await submit(photo({comment:'Changed'}))).status,409,'same key cannot silently overwrite');
-  const leads=await ok(await call('/api/admin/leads',{auth:true}));assert.equal(leads.total,1);assert.equal(leads.rows[0].kind,'photo');assert.equal(leads.rows[0].payload.sourcePage,payload.sourcePage);
+  const leads=await ok(await call('/api/admin/leads',{auth:true}));assert.equal(leads.total,1);assert.equal(leads.rows[0].kind,'photo');assert.equal(leads.rows[0].payload.sourcePage,payload.sourcePage);assert.equal(leads.rows[0].payload.comparedProjects[0].id,'museum');
   const detail=await ok(await call('/api/admin/leads/'+leads.rows[0].id,{auth:true}));assert.equal(detail.files.length,1);
   assert.equal((await call('/api/admin/files/'+detail.files[0].id)).status,401);
   assert.equal((await call('/uploads/'+detail.files[0].id)).status,404);

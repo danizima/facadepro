@@ -146,5 +146,61 @@
   "golden-horn-small": [
     600,
     450
+  ],
+  "museum-glass-2026": [
+    2250,
+    1500
+  ],
+  "museum-glass-2026-small": [
+    640,
+    427
+  ],
+  "museum-roof-2026": [
+    2250,
+    1500
+  ],
+  "museum-roof-2026-small": [
+    640,
+    427
+  ],
+  "museum-geometry-2026": [
+    2250,
+    1500
+  ],
+  "museum-geometry-2026-small": [
+    640,
+    427
+  ],
+  "museum-vertical-2026": [
+    1000,
+    1500
+  ],
+  "museum-vertical-2026-small": [
+    640,
+    960
+  ],
+  "burny-evening": [
+    1920,
+    1369
+  ],
+  "burny-evening-small": [
+    640,
+    456
+  ],
+  "burny-promenade": [
+    1920,
+    1280
+  ],
+  "burny-promenade-small": [
+    640,
+    427
+  ],
+  "meridiany-facade": [
+    1680,
+    1120
+  ],
+  "meridiany-facade-small": [
+    640,
+    427
   ]
 }

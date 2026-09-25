@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {DatabaseSync} from 'node:sqlite';
+import {applyPortfolioUpdate} from '../backend/portfolio-update.mjs';
+const read=name=>JSON.parse(readFileSync(new URL('../source/'+name,import.meta.url),'utf8'));
+const seed=read('content.json'),update=read('portfolio-update11.json'),current=structuredClone(seed);
+for(const patch of update.updates)current.projects.find(p=>p.id===patch.id).images=patch.fields[0].before;
+const edited=current.projects.find(p=>p.id==='burny');edited.images=['media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.webp'];edited.published=false;
+const db=new DatabaseSync(':memory:');db.exec('CREATE TABLE content(id INTEGER PRIMARY KEY,revision INTEGER,json TEXT)');db.prepare('INSERT INTO content VALUES(1,17,?)').run(JSON.stringify(current));
+applyPortfolioUpdate(db,update);const after=JSON.parse(db.prepare('SELECT json FROM content').get().json);
+assert.deepEqual(after.projects.find(p=>p.id==='burny'),edited,'custom photos and visibility preserved');
+assert.deepEqual(after.projects.find(p=>p.id==='museum').images,seed.projects.find(p=>p.id==='museum').images);
+const revision=db.prepare('SELECT revision FROM content').get().revision;applyPortfolioUpdate(db,update);assert.equal(db.prepare('SELECT revision FROM content').get().revision,revision,'restart does not reapply photos');
+db.close();console.log('PASS v11: photo migration preserves CMS images/visibility and only applies once');
