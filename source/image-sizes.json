@@ -202,5 +202,157 @@
   "meridiany-facade-small": [
     640,
     427
+  ],
+  "burny-evening-1280": [
+    1280,
+    913
+  ],
+  "burny-evening-thumb": [
+    160,
+    114
+  ],
+  "museum-vertical-2026-thumb": [
+    160,
+    240
+  ],
+  "restaurant-frame-thumb": [
+    160,
+    120
+  ],
+  "restaurant-facade-thumb": [
+    160,
+    213
+  ],
+  "meridiany-facade-1280": [
+    1279,
+    853
+  ],
+  "meridiany-facade-thumb": [
+    160,
+    107
+  ],
+  "museum-roof-2026-1280": [
+    1279,
+    853
+  ],
+  "museum-roof-2026-thumb": [
+    160,
+    107
+  ],
+  "meridiany-1280": [
+    1280,
+    853
+  ],
+  "meridiany-thumb": [
+    160,
+    107
+  ],
+  "museum-2025-05-thumb": [
+    160,
+    107
+  ],
+  "museum-geometry-2026-1280": [
+    1279,
+    853
+  ],
+  "museum-geometry-2026-thumb": [
+    160,
+    107
+  ],
+  "golden-horn-1280": [
+    1280,
+    960
+  ],
+  "golden-horn-thumb": [
+    160,
+    120
+  ],
+  "dom-s-uglom-1280": [
+    1280,
+    852
+  ],
+  "dom-s-uglom-thumb": [
+    160,
+    107
+  ],
+  "burny-1280": [
+    1280,
+    720
+  ],
+  "burny-thumb": [
+    160,
+    90
+  ],
+  "museum-2025-06-thumb": [
+    160,
+    107
+  ],
+  "museum-portfolio-thumb": [
+    160,
+    201
+  ],
+  "novy-thumb": [
+    160,
+    107
+  ],
+  "nakhodka-thumb": [
+    160,
+    120
+  ],
+  "lider-1280": [
+    1280,
+    853
+  ],
+  "lider-thumb": [
+    160,
+    107
+  ],
+  "museum-thumb": [
+    160,
+    110
+  ],
+  "restaurant-build-thumb": [
+    160,
+    120
+  ],
+  "milya-thumb": [
+    160,
+    90
+  ],
+  "restaurant-thumb": [
+    160,
+    213
+  ],
+  "facade-survey-poster-thumb": [
+    160,
+    90
+  ],
+  "museum-facade-thumb": [
+    160,
+    201
+  ],
+  "museum-detail-thumb": [
+    160,
+    201
+  ],
+  "museum-glass-2026-1280": [
+    1279,
+    853
+  ],
+  "museum-glass-2026-thumb": [
+    160,
+    107
+  ],
+  "burny-promenade-1280": [
+    1279,
+    853
+  ],
+  "burny-promenade-thumb": [
+    160,
+    107
+  ],
+  "brusnika-thumb": [
+    160,
+    90
   ]
 }

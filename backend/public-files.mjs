@@ -32,5 +32,18 @@ export async function servePublicFile(req,res,file,types,extra={}){
   headers.ETag=tag;
   if(String(req.headers['if-none-match']||'').split(',').map(s=>s.trim().replace(/^W\//,'')).some(t=>t===tag||t==='*')){res.writeHead(304,headers);res.end();return true;}
  }
+ const range=req.headers.range;
+ if(/\.(?:mp4|webm)$/.test(file)){
+  headers['Accept-Ranges']='bytes';
+  if(range&&(!req.headers['if-range']||req.headers['if-range']===tag)){
+   const match=/^bytes=(\d*)-(\d*)$/.exec(range);let start=0,end=bytes.length-1;
+   if(match&&(match[1]||match[2])){
+    if(!match[1])start=Math.max(0,bytes.length-Number(match[2]));
+    else{start=Number(match[1]);if(match[2])end=Math.min(end,Number(match[2]));}
+   }else start=NaN;
+   if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<0||start>=bytes.length||end<start){res.writeHead(416,{...headers,'Content-Range':'bytes */'+bytes.length,'Content-Length':0});res.end();return true;}
+   const chunk=bytes.subarray(start,end+1);res.writeHead(206,{...headers,'Content-Range':`bytes ${start}-${end}/${bytes.length}`,'Content-Length':chunk.length});res.end(req.method==='HEAD'?undefined:chunk);return true;
+  }
+ }
  headers['Content-Length']=bytes.length;res.writeHead(200,headers);res.end(req.method==='HEAD'?undefined:bytes);return true;
 }

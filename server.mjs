@@ -24,7 +24,7 @@ const secureCookie=production||process.env.COOKIE_SECURE==='true';
 const TRUST_PROXY=process.env.TRUST_PROXY==='1';
 const argPort=process.argv.indexOf('--port');const port=Number(argPort>=0?process.argv[argPort+1]:process.env.PORT||4173);
 const BODY_LIMIT=27*1024*1024,FILE_LIMIT=10*1024*1024,TOTAL_LIMIT=25*1024*1024;
-const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.svg':'image/svg+xml','.webp':'image/webp','.jpg':'image/jpeg','.png':'image/png','.pdf':'application/pdf','.xml':'application/xml; charset=utf-8','.txt':'text/plain; charset=utf-8'};
+const types={'.mp4':'video/mp4','.webm':'video/webm','.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.svg':'image/svg+xml','.webp':'image/webp','.jpg':'image/jpeg','.png':'image/png','.pdf':'application/pdf','.xml':'application/xml; charset=utf-8','.txt':'text/plain; charset=utf-8'};
 let activePublic=site,publishQueue=Promise.resolve(),mailWorking=false;
 const serviceNames={glazing:'Фасадное остекление',windows:'Оконные системы',repair:'Ремонт и восстановление',engineering:'Инженерная подготовка',supply:'Производство и снабжение',height:'Работы на высоте'};
 function runPython(script,input,env={},timeout=30000){return new Promise((resolve,reject)=>{const p=spawn(process.env.PYTHON||'python3',[script],{cwd:ROOT,env:{...process.env,...env},stdio:['pipe','pipe','pipe']});let out='',err='';const timer=setTimeout(()=>{p.kill();reject(Error('Python timeout'));},timeout);p.stdout.on('data',b=>out+=b);p.stderr.on('data',b=>err+=b);p.on('error',e=>{clearTimeout(timer);reject(e)});p.on('close',code=>{clearTimeout(timer);code===0?resolve(out):reject(Error(script.endsWith('mail.py')?'SMTP delivery failed: '+(out.match(/"error": \"([A-Za-z]+)\"/)?.[1]||'UnknownError'):err.slice(0,400)));});p.stdin.end(input||'');});}
@@ -182,8 +182,8 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
    try{
     let html=await readFile(path.join(dir,'public','projects',project.id+'.html'),'utf8');
     // Draft previews can require a script combination absent from published pages.
-    const css=['styles','enhancements','business','release4','visual5','museum','release6','release7','release8','release9','visual10','release103','release11'];
-    const js=['app','public','request','release4','visual5','museum','release6','release7','release8','release9','visual10','release11'];
+    const css=['styles','enhancements','business','release4','visual5','museum','release6','release7','release8','release9','visual10','release103','release11','release12'];
+    const js=['app','public','request','release4','visual5','museum','release6','release7','release8','release9','visual10','release11','release12'];
     html=html.replace(/<link rel="stylesheet" href="[^"]*bundles\/site-[a-f0-9]+\.css">/,css.map(n=>'<link rel="stylesheet" href="/'+n+'.css">').join(''));
     html=html.replace(/<script src="[^"]*bundles\/page-[a-f0-9]+\.js" defer><\/script>/,js.map(n=>'<script src="/'+n+'.js" defer></script>').join(''));
     json(res,200,{html:html.replace('<head>','<head><base href="'+origin(req)+'/projects/">')});

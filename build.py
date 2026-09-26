@@ -1,7 +1,7 @@
 """Generate the static site from portfolio data. Python 3, standard library only."""
 from pathlib import Path
 import json, re, html, urllib.parse, os
-import release4, visual5, release6, release7, release8, release9, assets9, visual10, release103, release11
+import release4, visual5, release6, release7, release8, release9, assets9, visual10, release103, release11, release12
 ROOT=Path(__file__).resolve().parent
 VERSION=json.loads((ROOT/'package.json').read_text())['version']
 OUT=Path(os.environ.get('FACADE_OUTPUT',str(ROOT/'site')))
@@ -32,10 +32,17 @@ def img(key,alt,base='',eager=False,sizes=None,full=False):
  width,height=IMAGE_SIZES.get(key,[1200,900])
  priority=' fetchpriority="high"' if eager else ''
  responsive=''
- sizes=e(sizes or '(max-width: 600px) 100vw, (max-width: 1000px) 65vw, 50vw') if sizes or not eager else None
- small_width=IMAGE_SIZES.get(key+'-small',[520])[0]
- if not full and not key.startswith('media/') and (ROOT/'site/assets'/f'{key}-small.webp').is_file() and IMAGE_SIZES.get(key+'-small',[520])[0]<width:
-  responsive=f' srcset="{base}assets/{key}-small.webp {small_width}w, {url} {width}w" sizes="{sizes}"' if not eager or sizes else ''
+ display_sizes=sizes or ('(max-width: 800px) calc(100vw - 40px), (max-width: 1100px) 700px, 60vw' if full else '100vw' if eager else '(max-width: 600px) calc(100vw - 40px), (max-width: 1000px) 65vw, 50vw')
+ candidates=[]
+ if not key.startswith('media/'):
+  for suffix in ['-thumb','-small','-1280']:
+   if suffix=='-thumb' and display_sizes!='80px':continue
+   variant=key+suffix
+   if variant in IMAGE_SIZES and IMAGE_SIZES[variant][0]<width and (ROOT/'site/assets'/f'{variant}.webp').is_file():
+    candidates.append((IMAGE_SIZES[variant][0],base+'assets/'+variant+'.webp'))
+  if candidates:
+   candidates.append((width,url));candidates=sorted(dict(candidates).items())
+   responsive=' srcset="'+', '.join(u+' '+str(w)+'w' for w,u in candidates)+'" sizes="'+e(display_sizes)+'"'
  focus=PHOTO_FOCUS.get(key,[50,50])
  attrs=f' data-photo="{e(key)}" style="--photo-mobile:{focus[0]}% {focus[1]}%"'
  return f'<img{attrs}{responsive} src="{url}" alt="{e(alt)}" width="{width}" height="{height}" loading="{"eager" if eager else "lazy"}" decoding="async"{priority}>' 
@@ -51,6 +58,7 @@ def page(path,title,desc,body,active='',extra=''):
  body=visual10.enhance(globals(),path,body)
  body=release103.enhance(globals(),path,body)
  body=release11.enhance(globals(),path,body)
+ body=release12.enhance(globals(),path,body)
  if path in ['index.html','about.html']: body+=release7.materials(globals())
  if path in ['index.html','contacts.html']:body+=release7.callback(globals())
  if path.startswith('projects/') and path.endswith('.html'):body+=release7.materials(globals(),path.split('/')[-1][:-5])

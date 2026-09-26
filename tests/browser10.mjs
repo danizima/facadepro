@@ -7,7 +7,7 @@ export async function verifyRelease10({page,base,shots}){
   await page.setViewportSize({width,height:900});await page.goto(base+'/',{waitUntil:'networkidle'});
   const photo=page.locator('.architecture-slide:not([hidden]) .hero-photo-link img');await photo.evaluate(img=>img.decode());
   assert.ok(!(await photo.getAttribute('src')).includes('-small'));
-  const clarity=await photo.evaluate(img=>{const box=img.getBoundingClientRect();return {natural:[img.naturalWidth,img.naturalHeight],rendered:[box.width,box.height],filter:getComputedStyle(img).filter};});
+  const clarity=await photo.evaluate(async img=>{const source=new Image();source.src=img.currentSrc;await source.decode();const box=img.getBoundingClientRect();return {natural:[source.naturalWidth,source.naturalHeight],rendered:[box.width,box.height],filter:getComputedStyle(img).filter};});
   assert.ok(clarity.rendered[0]<=clarity.natural[0]&&clarity.rendered[1]<=clarity.natural[1],'No image upscaling '+width+' '+JSON.stringify(clarity));
   assert.equal(clarity.filter,'none');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'home fits '+width);
   await page.locator('[data-hero-next]').click();assert.equal(await page.locator('[data-hero-tab="1"]').getAttribute('aria-selected'),'true');
