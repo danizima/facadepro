@@ -9,6 +9,7 @@ import {verifyRelease9} from './browser9.mjs';
 import {verifyRelease10} from './browser10.mjs';
 import {verifyRelease102} from './browser102.mjs';
 import {verifyRelease12} from './browser12.mjs';
+import {verifyRelease13} from './browser13.mjs';
 import {verifyRelease11} from './browser11.mjs';
 import {verifyRelease103} from './browser103.mjs';
 const require=createRequire(import.meta.url),{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
@@ -46,6 +47,7 @@ try{
  await verifyRelease103({page,base,shots});
  await verifyRelease11({page,base,shots});
  await verifyRelease12({page,base,shots});
+ await verifyRelease13({page,base,shots});
  for(const width of [390,320]){
   await page.setViewportSize({width,height:844});
   for(const route of ['/', '/compare.html?projects=museum,burny','/projects/museum.html','/request.html','/admin/']){

@@ -4,7 +4,10 @@ import {readFile} from 'node:fs/promises';
 
 export async function verifyRelease103({page,base,shots}){
   await page.goto(base+'/',{waitUntil:'networkidle'});
-  assert.equal(await page.locator('.project-card').count(),4,'no repeated home portfolios');
+  assert.equal(await page.locator('.home-proof').count(),1,'one portfolio section on the home page');
+  assert.equal(await page.locator('.home-proof .proof-card').count(),5,'five projects with participation facts');
+  const projectLinks=await page.locator('.home-proof .proof-image').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('href')));
+  assert.equal(new Set(projectLinks).size,5,'no repeated home projects');
   assert.equal(await page.locator('.audience-section,.work-story,.flagship-link,.craft-feature,.task-links').count(),0);
   assert.equal(await page.locator('.home-direction-grid a').count(),6);
   await page.screenshot({path:path.join(shots,'home-103-desktop.png'),fullPage:true});

@@ -16,7 +16,8 @@ export async function servePublicFile(req,res,file,types,extra={}){
  if(!entry||entry.stamp!==stamp){
   let bytes;try{bytes=await readFile(file);}catch{return false;}
   entry={stamp,bytes,gzip:text&&bytes.length>1000?gzipSync(bytes,{level:6}):null};
-  entry.tag='"'+createHash('sha256').update(bytes).digest('hex').slice(0,24)+'"';
+  entry.digest=createHash('sha256').update(bytes).digest('hex');
+  entry.tag='"'+entry.digest.slice(0,24)+'"';
   if(text&&bytes.length<1024*1024){
    if(cached.has(file)){const old=cached.get(file);cachedBytes-=old.bytes.length+(old.gzip?.length||0);cached.delete(file);}
    cached.set(file,entry);cachedBytes+=entry.bytes.length+(entry.gzip?.length||0);
@@ -25,7 +26,8 @@ export async function servePublicFile(req,res,file,types,extra={}){
  }
  const compressed=!!entry.gzip&&gzipAllowed(req.headers['accept-encoding']);
  const bytes=compressed?entry.gzip:entry.bytes,tag=compressed?entry.tag.slice(0,-1)+'-gz"':entry.tag;
- const immutable=/\/bundles\/[a-z]+-[a-f0-9]{16}\.(css|js)$/.test(file);
+ const bundleHash=/\/bundles\/[a-z]+-([a-f0-9]{16})\.(css|js)$/.exec(file)?.[1];
+ const immutable=Boolean(bundleHash&&entry.digest.startsWith(bundleHash));
  const headers={'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':immutable?'public, max-age=31536000, immutable':'no-cache','Vary':'Accept-Encoding',...extra};
  if(compressed)headers['Content-Encoding']='gzip';
  if(headers['Cache-Control']!=='no-store'){

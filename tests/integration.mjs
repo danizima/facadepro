@@ -25,9 +25,11 @@ try{
  const admin=await command(['scripts/create-admin.mjs','tester']);const password=admin.match(/Одноразовая выдача пароля: (.+)/)[1];
  await start();
  assert.equal((await call('/api/admin/leads')).status,401,'private leads');
+ assert.equal((await call('/api/admin/maintenance')).status,401,'maintenance requires authentication');
  assert.equal((await call('/data/facadepro.sqlite')).status,404,'database not served');
  assert.equal((await call('/api/admin/login',{method:'POST',body:{username:'tester',password},origin:'https://other.example'})).status,403,'origin blocked');
  const login=await call('/api/admin/login',{method:'POST',body:{username:'tester',password}});assert.equal(login.status,200);cookie=login.headers.get('set-cookie').split(';')[0];csrf=(await login.json()).csrf;
+ const maintenance=await (await call('/api/admin/maintenance',{auth:true})).json();assert.equal(maintenance.retention.closedDays,180);assert.equal(maintenance.retention.activeLeads,'preserved');assert.equal(maintenance.backups.localOnly,true);assert.equal(maintenance.backups.enabled,false);assert.ok(!JSON.stringify(maintenance).includes(temp),'maintenance status does not expose private paths');
  assert.equal((await call('/api/admin/content',{method:'PUT',auth:true,csrfToken:'wrong',body:{}})).status,403,'CSRF blocked');
  const p=data();let bad={...p,consent:'no'};assert.equal((await call('/api/requests',{method:'POST',body:multipart(bad),form:true})).status,422,'consent required');
  assert.equal((await call('/api/requests',{method:'POST',body:multipart(p,{bad:true}),form:true})).status,422,'executable blocked');

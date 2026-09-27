@@ -77,13 +77,24 @@ def render(job):
   if not re.fullmatch(r'[a-z0-9-]+',p['id']):raise ValueError('Invalid project id')
   url='https://facadepro.ru/projects/'+p['id']+'.html'
   story += [para(f"{index+1:02} / {p['type'].upper()}",'kicker'),para(p['title'],'project'),para(p['location'],'small'),Spacer(1,6),*([picture(p['images'][0],235),Spacer(1,8),credit(p)] if p['images'] else [para('Проект представлен составом выполненных работ.','small')]),Spacer(1,12)]
-  facts=[['Объём / участие',p['volume']],['Период / срок',p['period']]]
+  facts=[[label,p[key]] for label,key in [('Объём / участие','volume'),('Период / срок','period')] if p.get(key)]
   if p.get('client'):facts.append(['Заказчик',p['client']])
-  table=Table([[para(label,'label'),para(value,'fact')] for label,value in facts],colWidths=[125,CW-125],hAlign='LEFT')
-  table.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LINEABOVE',(0,0),(-1,-1),.5,LINE),('LEFTPADDING',(0,0),(-1,-1),0),('RIGHTPADDING',(0,0),(-1,-1),8),('TOPPADDING',(0,0),(-1,-1),8),('BOTTOMPADDING',(0,0),(-1,-1),8)]))
-  story += [table,Spacer(1,16),para('НАШЕ УЧАСТИЕ','kicker'),para(p['work'])]
+  if facts:
+   table=Table([[para(label,'label'),para(value,'fact')] for label,value in facts],colWidths=[125,CW-125],hAlign='LEFT')
+   table.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LINEABOVE',(0,0),(-1,-1),.5,LINE),('LEFTPADDING',(0,0),(-1,-1),0),('RIGHTPADDING',(0,0),(-1,-1),8),('TOPPADDING',(0,0),(-1,-1),8),('BOTTOMPADDING',(0,0),(-1,-1),8)]))
+   story += [table,Spacer(1,16)]
+  story += [para('НАШЕ УЧАСТИЕ','kicker'),para(p['work'])]
   link=Paragraph('<b>Фотографии и подробности</b><br/>Сканируйте QR-код или откройте '+f'<link href="{url}" color="#252525"><u>страницу проекта</u></link>.',styles['small'])
   qr=Table([[ProjectQR(url),link]],colWidths=[85,CW-85]);qr.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'MIDDLE'),('LEFTPADDING',(0,0),(-1,-1),0),('BACKGROUND',(0,0),(-1,-1),PALE),('TOPPADDING',(0,0),(-1,-1),9),('BOTTOMPADDING',(0,0),(-1,-1),9)]))
+  case=p.get('case') or {}
+  narrative=[(label,case.get(key,'')) for key,label in [('task','Задача'),('challenge','Особенности объекта'),('solution','Выполненные работы'),('result','Результат / участие')] if case.get(key,'').strip()]
+  if narrative:
+   # Use exactly the editable case values exposed by the public API and HTML.
+   # A deliberate detail page keeps the photographed summary readable; long
+   # editor-written descriptions may flow naturally onto following pages.
+   story += [PageBreak(),para(f"{index+1:02} / СОСТАВ УЧАСТИЯ",'kicker'),para(p['title'],'project'),para(p['location'],'small'),Spacer(1,12)]
+   for label,value in narrative:
+    story += [KeepTogether([para(label.upper(),'kicker'),para(value)]),Spacer(1,12)]
   story += [KeepTogether([Spacer(1,10),qr]),PageBreak()]
  story += [para('ОБСУДИМ ВАШ ПРОЕКТ','kicker'),para('Начнём<br/>с вашей задачи.'.replace('<br/>','\n'),'title'),Spacer(1,22),para('Ваш менеджер','kicker'),para(s['manager'],'project'),para(s['phone'],'large'),para(s['email'],'large'),Spacer(1,30),para('Владивосток','kicker'),para(s['vladivostok'],'body'),Spacer(1,15),para('Москва','kicker'),para(s['moscow'],'body'),Spacer(1,30),para(s['legalName'],'small'),para(f'ИНН {s["inn"]}  ·  КПП {s["kpp"]}','small'),para('facadepro.ru','large')]
  doc.build(story,onFirstPage=page,onLaterPages=page)

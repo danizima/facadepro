@@ -32,6 +32,8 @@ def profile_pdf(job):
     rows = [('ИНН / КПП',s['inn']+' / '+s['kpp']),('Офис во Владивостоке',s['vladivostok']),
             ('Офис в Москве',s['moscow']),('Ваш менеджер',s['manager']),
             ('Телефон',s['phone']),('Электронная почта',s['email'])]
+    if s.get('ogrn'):
+        rows.insert(1, ('ОГРН', s['ogrn']))
     table=Table([[para(k,'label'),para(v,'fact')] for k,v in rows], colWidths=[145,CW-145])
     table.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LINEABOVE',(0,0),(-1,-1),.5,LINE),
                               ('LEFTPADDING',(0,0),(-1,-1),0),('RIGHTPADDING',(0,0),(-1,-1),10),

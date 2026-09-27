@@ -107,3 +107,15 @@ Dockerfile также можно использовать для сборки п
 ## Обновление 5.0 → 5.1
 
 Замените исходники и пересоберите Docker-образ, сохранив том `/data`, SMTP и остальные переменные окружения. Добавлены `museum.py`, `site/museum.css`, `site/museum.js`, `source/museum-reports.json`, `source/photo-sources.json` и фотографии. Dockerfile включает новый модуль. Схема базы не изменена. После запуска проверьте `/projects/museum.html`, фильтр фотоотчётов и ссылку с главной. Не загружайте автономный HTML вместо серверного приложения.
+
+## Обслуживание данных в версии 13.0
+
+При `NODE_ENV=production` включено ежедневное локальное резервирование в `DATA_DIR/backups`. Настройки: `BACKUP_ENABLED=true`, `BACKUP_INTERVAL_HOURS=24`, `BACKUP_MAX_COPIES=14`, `BACKUP_RETENTION_DAYS=14`. Копии приватны и не обслуживаются HTTP. Контроль состояния — авторизованный GET `/api/admin/maintenance`.
+
+```bash
+DATA_DIR=/data node scripts/backup-data.mjs
+node scripts/restore-data.mjs --verify /data/backups/ИМЯ
+node scripts/restore-data.mjs /data/backups/ИМЯ --to-new-directory /data-restored
+```
+
+Восстановление отказывается перезаписывать существующий каталог, не запускает приложение и не меняет текущую конфигурацию. Перед переключением остановленного приложения на восстановленные данные проверьте приватный `runtime-config.json` и параметры запуска. Храните копию вне сервера: локальные копии не защищают от потери диска/VDS. Резервирование диска у Timeweb — отдельная платная настройка, её фактическое включение проверяется в панели провайдера.

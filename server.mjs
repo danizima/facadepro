@@ -13,9 +13,13 @@ import {createPortfolio} from './backend/portfolio.mjs';
 import {selectKit,createKit,kitDocuments} from './backend/kit.mjs';
 import {servePublicFile} from './backend/public-files.mjs';
 import {listLeads,updateFollowup,reminders,todayParam,staff} from './backend/followups.mjs';
+import {initializeRetention} from './backend/retention.mjs';
+import {createMaintenance} from './backend/backups.mjs';
 const solutionCatalog=JSON.parse(await readFile(path.join(ROOT,'source/solutions.json'),'utf8'));
 const site=path.join(ROOT,'site');
 const VERSION=JSON.parse(await readFile(path.join(ROOT,'package.json'),'utf8')).version;
+initializeRetention(db);
+const maintenance=createMaintenance({db,dataDir:DATA,version:VERSION});
 await mkdir(path.join(DATA,'materials'),{recursive:true,mode:0o700});
 const production=process.env.NODE_ENV==='production';
 const PUBLIC_URL=process.env.PUBLIC_URL||'';
@@ -46,7 +50,7 @@ function signature(buf,ext){const b=buf.subarray(0,256);if(ext==='pdf')return b.
 async function getFiles(form,imagesOnly=false,maxCount=imagesOnly?1:5){const entries=form.getAll('files').filter(f=>typeof f!=='string'&&f.size);if(entries.length>maxCount)throw fail(422,'Допустимо не более '+maxCount+' файлов.');let total=0;const files=[];for(const f of entries){total+=f.size;if(f.size>FILE_LIMIT||total>TOTAL_LIMIT)throw fail(413,'Не более 10 МБ на файл и 25 МБ суммарно.');const name=path.basename(f.name.replaceAll('\\','/')).replace(/[\r\n\u0000-\u001f]/g,'').slice(0,180),ext=name.split('.').at(-1).toLowerCase(),bytes=Buffer.from(await f.arrayBuffer());if((imagesOnly&&!['jpg','jpeg','png','webp'].includes(ext))||!signature(bytes,ext))throw fail(422,'Неподдерживаемый или повреждённый файл: '+name);files.push({id:randomUUID(),name,size:f.size,ext,bytes});}return files;}
 function leadPayload(f){const get=(name,max,required=false)=>text(f.get(name)||'',max,required);const services=[...new Set(f.getAll('service'))];if(!services.length||services.some(s=>!SERVICE_IDS.includes(s)))throw fail(422,'Выберите направление работ.');const p={services,kind:get('kind',20)||'request',object:get('object',100,true),city:get('city',120,true),area:get('area',30),timing:get('timing',100,true),documents:get('documents',150),comment:get('comment',3000),name:get('name',100,true),company:get('company',150),phone:get('phone',40),email:get('email',200),height:get('height',80),system:get('system',150),deadline:get('deadline',30),solution:get('solution',20),audience:get('audience',20),selection:get('selection',48)};
  if(p.audience&&!['contractor','developer','owner'].includes(p.audience))throw fail(422,'Проверьте выбранный сценарий.');if(p.selection){const shared=getShowcase(p.selection);p.selectionTitle=shared.title;} 
- if(p.solution&&!solutionCatalog.some(s=>s.id===p.solution))throw fail(422,'Неизвестная задача.');if(!['request','quote'].includes(p.kind))throw fail(422,'Неизвестный тип заявки.');if(!p.email&&!p.phone)throw fail(422,'Укажите телефон или email.');if(p.email&&!emailOK(p.email))throw fail(422,'Проверьте email.');if(p.phone&&(!/^[+\d\s().-]+$/.test(p.phone)||p.phone.replace(/\D/g,'').length<7||p.phone.replace(/\D/g,'').length>15))throw fail(422,'Проверьте телефон.');if(p.area&&(!Number.isFinite(Number(p.area))||Number(p.area)<1||Number(p.area)>1e7))throw fail(422,'Проверьте площадь.');if(f.get('consent')!=='yes')throw fail(422,'Подтвердите согласие на обработку данных заявки.');if(p.kind==='quote'&&!p.company)throw fail(422,'Для запроса КП укажите компанию или «Частный заказчик».');p.consentAt=new Date().toISOString();p.policyVersion='2026-09-23';p.comparedProjects=comparedProjects(f.get('comparedProjects'));p.sourcePage=cleanPage(get('sourcePage',150)||'/request.html');return p;}
+ if(p.solution&&!solutionCatalog.some(s=>s.id===p.solution))throw fail(422,'Неизвестная задача.');if(!['request','quote'].includes(p.kind))throw fail(422,'Неизвестный тип заявки.');if(!p.email&&!p.phone)throw fail(422,'Укажите телефон или email.');if(p.email&&!emailOK(p.email))throw fail(422,'Проверьте email.');if(p.phone&&(!/^[+\d\s().-]+$/.test(p.phone)||p.phone.replace(/\D/g,'').length<7||p.phone.replace(/\D/g,'').length>15))throw fail(422,'Проверьте телефон.');if(p.area&&(!Number.isFinite(Number(p.area))||Number(p.area)<1||Number(p.area)>1e7))throw fail(422,'Проверьте площадь.');if(f.get('consent')!=='yes')throw fail(422,'Подтвердите согласие на обработку данных заявки.');if(p.kind==='quote'&&!p.company)throw fail(422,'Для запроса КП укажите компанию или «Частный заказчик».');p.consentAt=new Date().toISOString();p.policyVersion='2026-09-27';p.comparedProjects=comparedProjects(f.get('comparedProjects'));p.sourcePage=cleanPage(get('sourcePage',150)||'/request.html');return p;}
 function comparedProjects(value){
  const ids=typeof value==='string'&&value?value.split(','):[];
  if(ids.length>3||new Set(ids).size!==ids.length)throw fail(422,'Выберите до трёх разных проектов.');
@@ -58,7 +62,7 @@ function callbackPayload(f){
  const name=text(f.get('name')||'',100,true),phone=text(f.get('phone')||'',40,true),preferredTime=text(f.get('preferredTime')||'',160);
  if(!/^[+\d\s().-]+$/.test(phone)||phone.replace(/\D/g,'').length<7||phone.replace(/\D/g,'').length>15)throw fail(422,'Проверьте номер телефона.');
  if(f.get('consent')!=='yes')throw fail(422,'Подтвердите согласие на обработку данных.');
- return {kind:'callback',services:[],object:'Обратный звонок',city:'Не указан',timing:preferredTime||'Уточнить',preferredTime,name,phone,email:'',company:'',comment:'Запрос обратного звонка',comparedProjects:comparedProjects(f.get('comparedProjects')),consentAt:new Date().toISOString(),policyVersion:'2026-09-23',sourcePage:cleanPage(text(f.get('sourcePage')||'/',150))};
+ return {kind:'callback',services:[],object:'Обратный звонок',city:'Не указан',timing:preferredTime||'Уточнить',preferredTime,name,phone,email:'',company:'',comment:'Запрос обратного звонка',comparedProjects:comparedProjects(f.get('comparedProjects')),consentAt:new Date().toISOString(),policyVersion:'2026-09-27',sourcePage:cleanPage(text(f.get('sourcePage')||'/',150))};
 }
 function photoPayload(f){
  const phone=text(f.get('phone')||'',40,true),email=text(f.get('email')||'',200);
@@ -67,7 +71,7 @@ function photoPayload(f){
  if(f.get('consent')!=='yes')throw fail(422,'Подтвердите согласие на обработку данных.');
  const project=text(f.get('project')||'',80);
  if(project&&!content().projects.some(p=>p.id===project&&p.published!==false))throw fail(422,'Выбранный проект недоступен. Обновите страницу формы.');
- return {kind:'photo',services:[],object:'Обращение с фотографиями',city:text(f.get('city')||'',120)||'Не указан',timing:'Уточнить',name:text(f.get('name')||'',100)||'Не указано',phone,email,company:'',comment:text(f.get('comment')||'',1500),comparedProjects:comparedProjects(project),consentAt:new Date().toISOString(),policyVersion:'2026-09-23',sourcePage:cleanPage(text(f.get('sourcePage')||'/photo-request.html',150))};
+ return {kind:'photo',services:[],object:'Обращение с фотографиями',city:text(f.get('city')||'',120)||'Не указан',timing:'Уточнить',name:text(f.get('name')||'',100)||'Не указано',phone,email,company:'',comment:text(f.get('comment')||'',1500),comparedProjects:comparedProjects(project),consentAt:new Date().toISOString(),policyVersion:'2026-09-27',sourcePage:cleanPage(text(f.get('sourcePage')||'/photo-request.html',150))};
 }
 async function materialFile(req,res,key){
  if(!/^materials\/[a-f0-9-]{36}\.(pdf|mp4|webm)$/.test(key))throw fail(404,'Файл не найден.');
@@ -113,13 +117,13 @@ async function flushMail(){
   }
  }finally{mailWorking=false;}
 }
-async function cleanup(){cleanSession();db.prepare('DELETE FROM events WHERE created<?').run(new Date(Date.now()-90*86400000).toISOString());const stale=db.prepare('SELECT id FROM leads WHERE created<?').all(new Date(Date.now()-180*86400000).toISOString());for(const row of stale){const files=db.prepare('SELECT id FROM files WHERE lead_id=?').all(row.id);transaction(()=>db.prepare('DELETE FROM leads WHERE id=?').run(row.id));for(const f of files)await rm(path.join(DATA,'uploads',f.id),{force:true});}db.prepare('DELETE FROM audit WHERE created<?').run(new Date(Date.now()-365*86400000).toISOString());}
+async function cleanup(){cleanSession();db.prepare('DELETE FROM events WHERE created<?').run(new Date(Date.now()-90*86400000).toISOString());db.prepare('DELETE FROM audit WHERE created<?').run(new Date(Date.now()-365*86400000).toISOString());}
 function stats(days){const since=new Date(Date.now()-days*86400000).toISOString(),get=(sql,...args)=>db.prepare(sql).all(...args);const sessions=db.prepare("SELECT COUNT(DISTINCT session_id) n FROM events WHERE event='page_view' AND created>=?").get(since).n;const stages=['page_view','request_start','step_2','step_3'];const funnel=stages.map(event=>({event,count:db.prepare('SELECT COUNT(DISTINCT session_id) n FROM events WHERE event=? AND created>=?').get(event,since).n}));funnel.push({event:'submitted',count:db.prepare('SELECT COUNT(DISTINCT session_id) n FROM leads WHERE created>=? AND session_id IS NOT NULL').get(since).n});return {days,sessions,leadPages:get("SELECT json_extract(payload,'$.sourcePage') page,COUNT(*) count FROM leads WHERE created>=? GROUP BY page ORDER BY count DESC",since),totalLeads:db.prepare('SELECT COUNT(*) n FROM leads WHERE created>=?').get(since).n,funnel,pages:get("SELECT page,COUNT(*) views,COUNT(DISTINCT session_id) visitors FROM events WHERE event='page_view' AND created>=? GROUP BY page ORDER BY views DESC LIMIT 15",since),services:get("SELECT detail service,COUNT(DISTINCT session_id) visitors FROM events WHERE event='service_interest' AND created>=? GROUP BY detail ORDER BY visitors DESC",since),sources:get("SELECT source,COUNT(DISTINCT session_id) visitors FROM events WHERE event='page_view' AND created>=? GROUP BY source ORDER BY visitors DESC LIMIT 10",since),leadsByDay:get('SELECT substr(created,1,10) day,COUNT(*) count FROM leads WHERE created>=? GROUP BY day ORDER BY day',since)};}
 const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new URL(req.url,origin(req));const route=decodeURIComponent(url.pathname);if(['POST','PUT','DELETE','PATCH'].includes(req.method))sameOrigin(req);if(req.method==='OPTIONS')throw fail(405,'Метод не поддерживается.');
  if(route==='/healthz'){json(res,200,{ok:true,version:VERSION});return;}
  if(route.startsWith('/materials/')&&['GET','HEAD'].includes(req.method)){await materialFile(req,res,route.slice(1));return;}
  if(route==='/api/public/projects'&&req.method==='GET'){json(res,200,{projects:content().projects.filter(p=>p.published!==false).map(p=>({id:p.id,title:p.title,type:p.type,location:p.location,period:p.period,volume:p.volume,work:p.work,serviceIds:p.serviceIds,case:p.case,image:p.images[0]}))});return;}
- if(route==='/api/public/config'&&req.method==='GET'){const s=content().settings;json(res,200,{forms:true,photoRequests:true,portfolio:true,contact:{email:s.email,phone:s.phone,manager:s.manager},uploads:{count:5,fileBytes:FILE_LIMIT,totalBytes:TOTAL_LIMIT},policyVersion:'2026-09-23'});return;}
+ if(route==='/api/public/config'&&req.method==='GET'){const s=content().settings;json(res,200,{forms:true,photoRequests:true,portfolio:true,contact:{email:s.email,phone:s.phone,manager:s.manager},uploads:{count:5,fileBytes:FILE_LIMIT,totalBytes:TOTAL_LIMIT},policyVersion:'2026-09-27'});return;}
  const selectionMatch=route.match(/^\/selection\/([a-f0-9]{48})(\/pdf)?$/);
  if(selectionMatch){
   res.setHeader('X-Robots-Tag','noindex, nofollow');res.setHeader('Referrer-Policy','no-referrer');
@@ -167,6 +171,7 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
  if(route.startsWith('/api/admin/')){
   const s=session(req,!['GET','HEAD'].includes(req.method));
   if(route==='/api/admin/session'&&req.method==='GET'){json(res,200,{username:s.username,csrf:s.csrf,smtpConfigured:notificationConfig().emailEnabled});return;}
+  if(route==='/api/admin/maintenance'&&req.method==='GET'){json(res,200,await maintenance.status());return;}
   if(route==='/api/admin/logout'&&req.method==='POST'){db.prepare('DELETE FROM sessions WHERE hash=?').run(s.hash);json(res,200,{ok:true},{'Set-Cookie':'fp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0'+(secureCookie?'; Secure':'')});return;}
   if(route==='/api/admin/password'&&req.method==='POST'){const b=await jsonBody(req,4000);if(!passwordValid(text(b.current,300,true),db.prepare('SELECT password FROM admins WHERE username=?').get(s.username).password))throw fail(422,'Текущий пароль неверен.');const pass=text(b.password,300,true);if(pass.length<14)throw fail(422,'Минимум 14 символов.');db.prepare('UPDATE admins SET password=? WHERE username=?').run(passwordHash(pass),s.username);db.prepare('DELETE FROM sessions WHERE username=? AND hash<>?').run(s.username,s.hash);audit(s.username,'password_changed');json(res,200,{ok:true});return;}
   if(route==='/api/admin/content'&&req.method==='GET'){json(res,200,content());return;}
@@ -260,4 +265,6 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
 server.requestTimeout=60000;server.headersTimeout=15000;server.maxRequestsPerSocket=100;
 server.listen(port,'0.0.0.0',()=>console.log('Local: http://localhost:'+port+'/'));
 const mailTimer=setInterval(()=>void flushMail(),30000);mailTimer.unref();const cleanupTimer=setInterval(()=>void cleanup().catch(()=>{}),3600000);cleanupTimer.unref();await cleanup();void flushMail();
-process.on('SIGTERM',()=>server.close(()=>{db.close();process.exit(0)}));
+const runMaintenance=()=>void maintenance.run().catch(()=>console.error('Could not save local maintenance status.'));
+const backupTimer=setInterval(runMaintenance,3600000);backupTimer.unref();runMaintenance();
+process.on('SIGTERM',()=>{clearInterval(backupTimer);server.close(async()=>{await maintenance.wait().catch(()=>{});db.close();process.exit(0)});});

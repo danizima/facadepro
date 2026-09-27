@@ -10,3 +10,5 @@
 @media(max-width:760px){.share-projects{grid-template-columns:1fr}.report-editor-photo{grid-template-columns:80px 1fr}.report-editor-photo img{width:80px}.preview-dialog{padding:10px}.rich-fields{padding:0 12px 14px}.showcase-actions{gap:14px}.rich-editor summary{font-size:14px}}
 
 .timeweb-mail-setup{padding:22px;background:#eeeeee;border:1px solid #d0d0d0;border-radius:7px;margin:20px 0;color:#252525}.timeweb-mail-setup h3{font-size:18px;overflow-wrap:anywhere}.timeweb-mail-setup p{font-size:14px;line-height:1.7;margin:14px 0}.timeweb-mail-setup button{min-height:44px;text-align:left}
+
+.account-maintenance{max-width:850px;margin-top:24px}.account-maintenance .maintenance-note{font-size:14px;line-height:1.7;margin:24px 0 16px}.account-maintenance .muted{line-height:1.7}.account-maintenance .error{margin-bottom:16px}
