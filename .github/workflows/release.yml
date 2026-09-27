@@ -22,7 +22,7 @@ jobs:
       - name: Install PDF and browser libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-reportlab python3-pil libnss3 libatk-bridge2.0-0 libxkbcommon0 libgbm1 libasound2t64 fonts-dejavu-core
+          sudo apt-get install -y python3-reportlab python3-pil poppler-utils libnss3 libatk-bridge2.0-0 libxkbcommon0 libgbm1 libasound2t64 fonts-dejavu-core
       - name: Check syntax and build pages
         run: |
           npm run check

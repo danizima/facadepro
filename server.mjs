@@ -10,6 +10,7 @@ import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import path from 'node:path';
 import {ROOT,DATA,db,content,hash,passwordValid,passwordHash,rate,audit,transaction,cleanSession,fail,text,emailOK,validateContent,SERVICE_IDS,STATUSES} from './backend/store.mjs';
 import {createPortfolio} from './backend/portfolio.mjs';
+import {createPublicPortfolio} from './backend/public-portfolio.mjs';
 import {selectKit,createKit,kitDocuments} from './backend/kit.mjs';
 import {servePublicFile} from './backend/public-files.mjs';
 import {listLeads,updateFollowup,reminders,todayParam,staff} from './backend/followups.mjs';
@@ -18,6 +19,7 @@ import {createMaintenance} from './backend/backups.mjs';
 const solutionCatalog=JSON.parse(await readFile(path.join(ROOT,'source/solutions.json'),'utf8'));
 const site=path.join(ROOT,'site');
 const VERSION=JSON.parse(await readFile(path.join(ROOT,'package.json'),'utf8')).version;
+const publicPortfolio=createPublicPortfolio({readContent:content,generate:createPortfolio,version:VERSION});
 initializeRetention(db);
 const maintenance=createMaintenance({db,dataDir:DATA,version:VERSION});
 await mkdir(path.join(DATA,'materials'),{recursive:true,mode:0o700});
@@ -121,6 +123,14 @@ async function cleanup(){cleanSession();db.prepare('DELETE FROM events WHERE cre
 function stats(days){const since=new Date(Date.now()-days*86400000).toISOString(),get=(sql,...args)=>db.prepare(sql).all(...args);const sessions=db.prepare("SELECT COUNT(DISTINCT session_id) n FROM events WHERE event='page_view' AND created>=?").get(since).n;const stages=['page_view','request_start','step_2','step_3'];const funnel=stages.map(event=>({event,count:db.prepare('SELECT COUNT(DISTINCT session_id) n FROM events WHERE event=? AND created>=?').get(event,since).n}));funnel.push({event:'submitted',count:db.prepare('SELECT COUNT(DISTINCT session_id) n FROM leads WHERE created>=? AND session_id IS NOT NULL').get(since).n});return {days,sessions,leadPages:get("SELECT json_extract(payload,'$.sourcePage') page,COUNT(*) count FROM leads WHERE created>=? GROUP BY page ORDER BY count DESC",since),totalLeads:db.prepare('SELECT COUNT(*) n FROM leads WHERE created>=?').get(since).n,funnel,pages:get("SELECT page,COUNT(*) views,COUNT(DISTINCT session_id) visitors FROM events WHERE event='page_view' AND created>=? GROUP BY page ORDER BY views DESC LIMIT 15",since),services:get("SELECT detail service,COUNT(DISTINCT session_id) visitors FROM events WHERE event='service_interest' AND created>=? GROUP BY detail ORDER BY visitors DESC",since),sources:get("SELECT source,COUNT(DISTINCT session_id) visitors FROM events WHERE event='page_view' AND created>=? GROUP BY source ORDER BY visitors DESC LIMIT 10",since),leadsByDay:get('SELECT substr(created,1,10) day,COUNT(*) count FROM leads WHERE created>=? GROUP BY day ORDER BY day',since)};}
 const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new URL(req.url,origin(req));const route=decodeURIComponent(url.pathname);if(['POST','PUT','DELETE','PATCH'].includes(req.method))sameOrigin(req);if(req.method==='OPTIONS')throw fail(405,'Метод не поддерживается.');
  if(route==='/healthz'){json(res,200,{ok:true,version:VERSION});return;}
+ if(route==='/downloads/portfolio.pdf'){
+  if(!['GET','HEAD'].includes(req.method))throw fail(405,'Метод не поддерживается.');
+  if(!rate('portfolio:'+ip(req),12,600000))throw fail(429,'Слишком много подборок. Попробуйте через несколько минут.');
+  const pdf=await publicPortfolio(),tag='"portfolio-'+hash(pdf).slice(0,24)+'"';
+  const pdfHeaders={'Content-Type':'application/pdf','Content-Length':pdf.length,'Content-Disposition':disposition('Портфолио_ФАСАД_PRO.pdf'),'Cache-Control':'no-cache',ETag:tag};
+  if(String(req.headers['if-none-match']||'').split(',').map(value=>value.trim().replace(/^W\//,'')).some(value=>value===tag||value==='*')){delete pdfHeaders['Content-Length'];res.writeHead(304,pdfHeaders);res.end();return;}
+  res.writeHead(200,pdfHeaders);res.end(req.method==='HEAD'?undefined:pdf);return;
+ }
  if(route.startsWith('/materials/')&&['GET','HEAD'].includes(req.method)){await materialFile(req,res,route.slice(1));return;}
  if(route==='/api/public/projects'&&req.method==='GET'){json(res,200,{projects:content().projects.filter(p=>p.published!==false).map(p=>({id:p.id,title:p.title,type:p.type,location:p.location,period:p.period,volume:p.volume,work:p.work,serviceIds:p.serviceIds,case:p.case,image:p.images[0]}))});return;}
  if(route==='/api/public/config'&&req.method==='GET'){const s=content().settings;json(res,200,{forms:true,photoRequests:true,portfolio:true,contact:{email:s.email,phone:s.phone,manager:s.manager},uploads:{count:5,fileBytes:FILE_LIMIT,totalBytes:TOTAL_LIMIT},policyVersion:'2026-09-27'});return;}

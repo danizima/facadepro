@@ -96,7 +96,9 @@ def render(job):
    for label,value in narrative:
     story += [KeepTogether([para(label.upper(),'kicker'),para(value)]),Spacer(1,12)]
   story += [KeepTogether([Spacer(1,10),qr]),PageBreak()]
- story += [para('ОБСУДИМ ВАШ ПРОЕКТ','kicker'),para('Начнём<br/>с вашей задачи.'.replace('<br/>','\n'),'title'),Spacer(1,22),para('Ваш менеджер','kicker'),para(s['manager'],'project'),para(s['phone'],'large'),para(s['email'],'large'),Spacer(1,30),para('Владивосток','kicker'),para(s['vladivostok'],'body'),Spacer(1,15),para('Москва','kicker'),para(s['moscow'],'body'),Spacer(1,30),para(s['legalName'],'small'),para(f'ИНН {s["inn"]}  ·  КПП {s["kpp"]}','small'),para('facadepro.ru','large')]
+ story += [para('ОБСУДИМ ВАШ ПРОЕКТ','kicker'),para('Начнём<br/>с вашей задачи.'.replace('<br/>','\n'),'title'),Spacer(1,22),para('Ваш менеджер','kicker'),para(s['manager'],'project'),para(s['phone'],'large'),para(s['email'],'large'),Spacer(1,30),para('Владивосток','kicker'),para(s['vladivostok'],'body'),Spacer(1,15),para('Москва','kicker'),para(s['moscow'],'body'),Spacer(1,30),para(s['legalName'],'small'),para(f'ИНН {s["inn"]}  ·  КПП {s["kpp"]}','small')]
+ if s.get('ogrn'):story.append(para('ОГРН '+s['ogrn'],'small'))
+ story.append(para('facadepro.ru','large'))
  doc.build(story,onFirstPage=page,onLaterPages=page)
  return result.getvalue()
 

@@ -1,15 +1,19 @@
 """Package self-contained public/admin previews and the deployable source ZIP."""
 from pathlib import Path
-import json,re,base64,zipfile,sys
+import json,re,base64,zipfile,sys,mimetypes
+from backend.portfolio import render as render_portfolio
 root=Path(__file__).resolve().parent;site=root/'site'
 out=Path(sys.argv[1]).resolve() if len(sys.argv)>1 else root.parent/'output'
 if out.is_relative_to(root):raise SystemExit('Choose an output directory outside the project.')
 out.mkdir(parents=True,exist_ok=True)
 def js(value):return json.dumps(value,ensure_ascii=False).replace('<','\\u003c')
 def data(path,mime):return 'data:'+mime+';base64,'+base64.b64encode(path.read_bytes()).decode()
-assets={p.name:data(p,'image/svg+xml' if p.suffix=='.svg' else 'image/webp') for p in (site/'assets').iterdir() if p.is_file()}
-downloads={'portfolio.pdf':data(site/'downloads/portfolio.pdf','application/pdf')}
-css='\n'.join((site/name).read_text() for name in ['styles.css','enhancements.css','business.css','release4.css','visual5.css','museum.css','release6.css','release7.css','release8.css','release9.css','visual10.css','release103.css','release11.css','release12.css','vendor/leaflet/leaflet.css'])
+assets={p.name:data(p,mimetypes.guess_type(p.name)[0] or 'application/octet-stream') for p in (site/'assets').iterdir() if p.is_file()}
+seed=json.loads((root/'source/content.json').read_text())
+public_projects=[p for p in seed['projects'] if p.get('published') is not False][:20]
+portfolio=render_portfolio({'projects':public_projects,'settings':seed['settings'],'recipient':''})
+downloads={'portfolio.pdf':'data:application/pdf;base64,'+base64.b64encode(portfolio).decode()}
+css='\n'.join((site/name).read_text() for name in ['styles.css','enhancements.css','business.css','release4.css','visual5.css','museum.css','release6.css','release7.css','release8.css','release9.css','visual10.css','release103.css','release11.css','release12.css','release13.css','vendor/leaflet/leaflet.css'])
 app='\n'.join((site/name).read_text() for name in ['vendor/leaflet/leaflet.js','app.js','public.js','request.js','release4.js','visual5.js','museum.js','release6.js','release7.js','release8.js','release9.js','visual10.js','photo-request.js','release11.js','release12.js'])
 pages={}
 for path in site.rglob('*.html'):
@@ -42,7 +46,7 @@ appadmin=(site/'admin/admin.js').read_text().replace('Проект сохран�
 admin=admin.replace('</body>','<script>'+mock.replace('</script','<\\/script')+'\n'+appadmin.replace('</script','<\\/script')+'</script></body>')
 (out/'Фасад_PRO_панель_демо.html').write_text(admin)
 allowed={'site','source','backend','scripts','tests','deploy'}
-rootfiles={'package.json','server.mjs','build.py','site_sections.py','release4.py','visual5.py','museum.py','release6.py','release7.py','release8.py','release9.py','assets9.py','visual10.py','release103.py','release11.py','release12.py','requirements.txt','THIRD_PARTY.md','package-preview.py','Dockerfile','compose.yaml','nginx.conf','.dockerignore','.gitignore','.env.example','README.md','DEPLOY.md'}
+rootfiles={'package.json','server.mjs','build.py','site_sections.py','release4.py','visual5.py','museum.py','release6.py','release7.py','release8.py','release9.py','assets9.py','visual10.py','release103.py','release11.py','release12.py','release13.py','seo13.py','media_validation.py','requirements.txt','THIRD_PARTY.md','package-preview.py','Dockerfile','compose.yaml','nginx.conf','.dockerignore','.gitignore','.env.example','README.md','DEPLOY.md'}
 with zipfile.ZipFile(out/'Фасад_PRO_сайт_Timeweb.zip','w',zipfile.ZIP_DEFLATED) as z:
  for path in sorted(root.rglob('*')):
   rel=path.relative_to(root)
