@@ -32,6 +32,8 @@ import {verifyNavigation17} from './browser-navigation17.mjs';
 import {verifySolutions18} from './browser-solutions18.mjs';
 import {verifyPortal18} from './browser-portal18.mjs';
 import {verifyCrm18} from './browser-crm18.mjs';
+import {verifyComparison19} from './browser-comparison19.mjs';
+import {verifyDiscovery19} from './browser-discovery19.mjs';
 const require=createRequire(import.meta.url),{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=new URL('../',import.meta.url).pathname,data=await mkdtemp(path.join(tmpdir(),'facadepro-browser-')),base='http://127.0.0.1:18746',shots=path.join(root,'artifacts/browser');await mkdir(shots,{recursive:true});
 const env={...process.env,DATA_DIR:data,PORT:'18746',PUBLIC_URL:base,NODE_ENV:'test',SMTP_HOST:'',SMTP_FROM:'',TELEGRAM_BOT_TOKEN:'',TELEGRAM_CHAT_ID:''};
@@ -90,6 +92,8 @@ try{
  await verifySolutions18({page,base,shots});
  await verifyPortal18({page,base,shots});
  await verifyCrm18({page,base,shots});
+ await verifyComparison19({page,base,shots});
+ await verifyDiscovery19({page,base,shots});
  for(const width of [390,320]){
   await page.setViewportSize({width,height:844});
   for(const route of ['/', '/compare.html?projects=museum,burny','/projects/museum.html','/request.html','/admin/']){

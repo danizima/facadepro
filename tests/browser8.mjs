@@ -83,7 +83,7 @@ export async function verifyRelease8({page, base, shots}) {
     assert.equal(await page.locator('.selection-tray').isVisible(), false);
     await page.keyboard.press('Escape');
     await page.locator('[data-selection-link]').click();
-    await page.locator('.compare-table').waitFor();
+    await page.locator('.compare-mobile').waitFor();
     await page.goto(base + '/request.html?project=museum', {waitUntil:'networkidle'});
     await page.locator('.request-project-context').waitFor();
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));

@@ -11,6 +11,7 @@ import path from 'node:path';
 import {ROOT,DATA,db,content,hash,privateHash,passwordValid,passwordHash,rate,audit,transaction,cleanSession,fail,text,emailOK,validateContent,SERVICE_IDS,STATUSES} from './backend/store.mjs';
 import {createPortfolio} from './backend/portfolio.mjs';
 import {createPublicPortfolio} from './backend/public-portfolio.mjs';
+import {createSelectedPortfolio} from './backend/selected-portfolio19.mjs';
 import {selectKit,createKit,kitDocuments} from './backend/kit.mjs';
 import {servePublicFile} from './backend/public-files.mjs';
 import {listLeads,updateFollowup,reminders,todayParam,staff} from './backend/followups.mjs';
@@ -26,6 +27,7 @@ const solutionCatalog=JSON.parse(await readFile(path.join(ROOT,'source/solutions
 const site=path.join(ROOT,'site');
 const VERSION=JSON.parse(await readFile(path.join(ROOT,'package.json'),'utf8')).version;
 const publicPortfolio=createPublicPortfolio({readContent:content,generate:createPortfolio,version:VERSION});
+const selectedPortfolio=createSelectedPortfolio({readContent:content,generate:createPortfolio,text,fail});
 const crm=createCRM15({db,fail,text,emailOK,SERVICE_IDS,STATUSES,audit,transaction,hash,staff});
 const quotes=createQuotes({db,dataDir:DATA,fail,text,audit,content,onManagerAction:crm.recordManagerAction});
 const portal=createClientPortal({db,DATA,hash,privateHash,text,fail,content,transaction,signature,onManagerAction:crm.recordManagerAction,onAddition:({leadId,additionId})=>{
@@ -228,10 +230,7 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
  }
  if(route==='/api/portfolio'&&req.method==='POST'){
   if(!rate('portfolio:'+ip(req),12,600000))throw fail(429,'Слишком много подборок. Попробуйте через несколько минут.');
-  const input=await jsonBody(req,5000),ids=input.projects;
-  if(!Array.isArray(ids)||ids.length<1||ids.length>20||new Set(ids).size!==ids.length||ids.some(id=>typeof id!=='string'))throw fail(422,'Выберите от 1 до 20 разных объектов.');
-  const current=content(),projects=ids.map(id=>current.projects.find(p=>p.id===id&&p.published!==false));if(projects.some(p=>!p))throw fail(422,'Один из объектов больше не опубликован. Обновите подборку.');
-  const recipient=text(input.recipient||'',140),pdf=await createPortfolio({projects,settings:current.settings,recipient});
+  const input=await jsonBody(req,5000),pdf=await selectedPortfolio(input);
   res.writeHead(200,{'Content-Type':'application/pdf','Content-Length':pdf.length,'Content-Disposition':disposition('Портфолио_ФАСАД_PRO_подборка.pdf'),'Cache-Control':'no-store'});res.end(pdf);return;
  }
  if(['/api/requests','/api/callback','/api/photo-request'].includes(route)&&req.method==='POST'){

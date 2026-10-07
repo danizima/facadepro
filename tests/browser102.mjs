@@ -18,8 +18,8 @@ export async function verifyRelease102({page,base,shots}) {
   await page.locator('.request-project-context').waitFor();
   assert.ok(await page.locator('.request-project-context img').evaluate(img=>img.complete&&img.naturalWidth>0));
   await page.goto(base+'/compare.html?projects=dvfu,museum',{waitUntil:'networkidle'});
-  await page.locator('.compare-table').waitFor();
-  assert.match(await page.locator('.compare-table').innerText(),/ФОК-1/);
+  await page.locator('.compare-mobile').waitFor();
+  assert.match(await page.locator('.compare-mobile').innerText(),/ФОК-1/);
   await page.goto(base+'/map.html',{waitUntil:'networkidle'});
   await page.locator('#map-list [data-id=dvfu]').click();
   assert.match(await page.locator('#map-detail').innerText(),/ФОК-1/);

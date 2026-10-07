@@ -71,7 +71,7 @@ export async function verifyRelease13({page,base,shots}){
   await page.setViewportSize({width,height:900});
   for(const route of ['/','/projects/golden-horn.html','/projects/novy.html','/compare.html?projects=burny,golden-horn']){
    await page.goto(base+route,{waitUntil:'networkidle'});
-   if(route.includes('compare'))await page.locator('.compare-table').waitFor();
+   if(route.includes('compare'))await page.locator(width<=700?'.compare-mobile':'.compare-table').waitFor();
    await fits(page,'v13 page fits '+width+' '+route);
    if(route==='/'&&[768,390].includes(width)){
     await page.locator('.home-entry-paths').screenshot({path:path.join(shots,'entry-v13-'+width+'.png')});
