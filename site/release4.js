@@ -23,20 +23,52 @@
   $('#map-load').onclick=()=>{if(offline){$('#map-message').textContent='Карта улиц доступна на размещённом сайте. В автономной версии работают метки, фильтры и карточки.';return;}if(!map||tileLayer)return;tileLayer=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(map);$('#map-load').hidden=true;$('#map-message').textContent='Загружаем карту OpenStreetMap…';tileLayer.on('load',()=>$('#map-message').textContent='Карта OpenStreetMap. Метки объединяют объекты в одном населённом пункте.');tileLayer.on('tileerror',()=>$('#map-message').textContent='Карта улиц недоступна. Метки, фильтры и карточки продолжают работать.');};render();
  }
  if($('#solution-result')){
-  const types=['Жилой комплекс','Гостиница','Общественное здание','Коммерческое здание','Частный объект','Другой объект'];let selected=null;
+  const types=['Жилой комплекс','Гостиница','Общественное здание','Коммерческое здание','Частный объект','Другой объект'];let selected=null,selectedObject='';
   const requestURL=(s,object='')=>'request.html?'+new URLSearchParams({solution:s.id,...(s.scope?{scope:s.scope}:{}),...(object?{object}:{})});
-  function show(id,focus=false){
+  const query=()=>new URLSearchParams(window.facadeQuery??location.search);
+  function writeURL(push=false){
+   if(typeof URL==='undefined')return;
+   const url=new URL(location.href);url.searchParams.delete('solution');url.searchParams.delete('object');
+   if(selected){url.searchParams.set('solution',selected.id);if(selectedObject)url.searchParams.set('object',selectedObject);}
+   try{if(window.facadeUpdateSearch)window.facadeUpdateSearch(url.searchParams.toString());else if(url.href!==location.href)window.history[push?'pushState':'replaceState'](null,'',url);}catch{/* A local preview may not allow navigation state. */}
+  }
+  function moveTo(element,scrollTarget=element){
+   if(!element)return;element.focus?.({preventScroll:true});
+   if(!scrollTarget.getBoundingClientRect||!window.scrollTo)return;
+   const header=$('.header')?.getBoundingClientRect().height||0;
+   window.scrollTo({top:Math.max(0,scrollTarget.getBoundingClientRect().top+window.scrollY-header-20),behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+  }
+  function show(id,focus=false,push=false){
    const s=data.solutions.find(s=>s.id===id);if(!s)return;selected=s;
    all('[data-solution]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.solution===id)));
    const related=s.projects.map(id=>projects.find(p=>p.id===id)).filter(Boolean);
    const directions=s.consultation?'':`<div class="solution-directions">${s.services.map(id=>`<a href="services/${id}.html">${esc(names[id])} ↗</a>`).join('')}</div>`;
    const detail=s.detail===false?'':`<a class="solution-detail-link" href="tasks/${id}.html">Подробнее о задаче ↗</a>`;
    $('#solution-result').hidden=false;
-   $('#solution-result').innerHTML=`<div class="solution-result-grid"><div><p class="eyebrow">${s.consultation?'Уточним направление вместе':'Подход к вашей задаче'}</p><h2 tabindex="-1">${esc(s.title)}</h2><p>${esc(s.text)}</p>${directions}${detail}<label class="solution-object">Тип вашего объекта<select id="solution-object"><option value="">Укажу в заявке</option>${types.map(t=>'<option>'+t+'</option>').join('')}</select></label><a id="solution-request" class="button" href="${esc(requestURL(s))}">${s.consultation?'Обсудить задачу с менеджером':'Обсудить эту задачу'} ↗</a></div><aside class="brief-panel"><p class="eyebrow">К первому разговору</p><h3>Что подготовить</h3><ul>${s.inputs.map(t=>'<li>'+esc(t)+'</li>').join('')}</ul><p>Если части материалов нет, начнём с описания. Точный состав работ определим после изучения объекта.</p></aside></div>${related.length?'<div class="solution-projects"><h3>Опыт по связанным направлениям</h3><p>Примеры работ с подобными системами. Состав вашего проекта обсудим отдельно.</p><div class="project-grid">'+related.map(projectCard).join('')+'</div></div>':''}`;
-   $('#solution-object').onchange=()=>{$('#solution-request').href=requestURL(s,$('#solution-object').value);};
-   if(focus)$('#solution-result h2').focus({preventScroll:true});
+   $('#solution-result').innerHTML=`<div class="solution-result-actions"><button type="button" class="text-button" id="solution-change">← Изменить задачу</button><button type="button" class="text-button" id="solution-share">Поделиться решением ↗</button></div><p id="solution-share-status" role="status" aria-live="polite"></p><a id="solution-share-link" class="solution-share-link" hidden></a><div class="solution-result-grid"><div><p class="eyebrow">${s.consultation?'Уточним направление вместе':'Подход к вашей задаче'}</p><h2 tabindex="-1">${esc(s.title)}</h2><p>${esc(s.text)}</p>${directions}${detail}<label class="solution-object">Тип вашего объекта<select id="solution-object"><option value="">Укажу в заявке</option>${types.map(t=>'<option>'+t+'</option>').join('')}</select></label><a id="solution-request" class="button" href="${esc(requestURL(s,selectedObject))}">${s.consultation?'Обсудить задачу с менеджером':'Обсудить эту задачу'} ↗</a></div><aside class="brief-panel"><p class="eyebrow">К первому разговору</p><h3>Что подготовить</h3><ul>${s.inputs.map(t=>'<li>'+esc(t)+'</li>').join('')}</ul><p>Если части материалов нет, начнём с описания. Точный состав работ определим после изучения объекта.</p></aside></div>${related.length?'<div class="solution-projects"><h3>Опыт по связанным направлениям</h3><p>Примеры работ с подобными системами. Состав вашего проекта обсудим отдельно.</p><div class="project-grid">'+related.map(projectCard).join('')+'</div></div>':''}`;
+   $('#solution-object').value=selectedObject;
+   $('#solution-object').onchange=()=>{selectedObject=types.includes($('#solution-object').value)?$('#solution-object').value:'';$('#solution-request').href=requestURL(s,selectedObject);writeURL(true);const status=$('#solution-share-status'),link=$('#solution-share-link');if(status)status.textContent='';if(link)link.hidden=true;};
+   const change=$('#solution-change'),share=$('#solution-share');
+   if(change)change.onclick=()=>moveTo(all('[data-solution]').find(b=>b.dataset.solution===selected.id));
+   if(share)share.onclick=async()=>{
+    const url=new URL('https://facadepro.ru/solutions.html');url.searchParams.set('solution',selected.id);if(selectedObject)url.searchParams.set('object',selectedObject);
+    const status=$('#solution-share-status'),link=$('#solution-share-link');share.disabled=true;
+    try{if(!window.navigator?.clipboard?.writeText)throw Error();await window.navigator.clipboard.writeText(url.href);status.textContent='Ссылка на выбранную задачу скопирована.';link.hidden=true;}
+    catch{status.textContent='Скопируйте ссылку на выбранную задачу:';link.href=link.textContent=url.href;link.hidden=false;}
+    finally{share.disabled=false;}
+   };
+   writeURL(push);if(focus)moveTo($('#solution-result h2'),$('#solution-result'));
   }
-  all('[data-solution]').forEach(b=>b.onclick=()=>show(b.dataset.solution,true));const q=new URLSearchParams(window.facadeQuery??location.search);if(q.has('solution'))show(q.get('solution'));
+  function restore(focus=false){
+   const q=query(),id=q.get('solution');selectedObject=types.includes(q.get('object'))?q.get('object'):'';
+   if(data.solutions.some(s=>s.id===id)){
+    show(id);
+    if(focus){const reveal=()=>{if(selected?.id===id)moveTo($('#solution-result h2'),$('#solution-result'));};if(window.requestAnimationFrame)window.requestAnimationFrame(reveal);else reveal();}
+   }
+   else{selected=null;selectedObject='';$('#solution-result').hidden=true;$('#solution-result').replaceChildren?.();all('[data-solution]').forEach(b=>b.setAttribute('aria-pressed','false'));writeURL();}
+  }
+  all('[data-solution]').forEach(b=>b.onclick=()=>show(b.dataset.solution,true,true));
+  window.addEventListener?.('popstate',()=>restore(true));restore(true);
  }
  if($('#portfolio-form')){
   let selected=[],busy=false,pdfUrl='';const query=new URLSearchParams(window.facadeQuery??location.search);selected=(query.get('projects')||'').split(',').filter((id,i,a)=>projects.some(p=>p.id===id)&&a.indexOf(id)===i).slice(0,20);
