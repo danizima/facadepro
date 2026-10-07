@@ -4,6 +4,7 @@ import {mkdtemp,mkdir,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
 import {verifyRelease8} from './browser8.mjs';
 import {verifyRelease9} from './browser9.mjs';
 import {verifyRelease10} from './browser10.mjs';
@@ -24,6 +25,10 @@ import {verifyQuoteTools16} from './browser-quote-tools16.mjs';
 import {verifyClient16} from './browser-client16.mjs';
 import {verifyRelease11} from './browser11.mjs';
 import {verifyRelease103} from './browser103.mjs';
+import {verifyBrief17} from './browser-brief17.mjs';
+import {verifyBudget17} from './browser-budget17.mjs';
+import {verifyCalendar17} from './browser-calendar17.mjs';
+import {verifyNavigation17} from './browser-navigation17.mjs';
 const require=createRequire(import.meta.url),{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=new URL('../',import.meta.url).pathname,data=await mkdtemp(path.join(tmpdir(),'facadepro-browser-')),base='http://127.0.0.1:18746',shots=path.join(root,'artifacts/browser');await mkdir(shots,{recursive:true});
 const env={...process.env,DATA_DIR:data,PORT:'18746',PUBLIC_URL:base,NODE_ENV:'test',SMTP_HOST:'',SMTP_FROM:'',TELEGRAM_BOT_TOKEN:'',TELEGRAM_CHAT_ID:''};
@@ -72,6 +77,13 @@ try{
  await verifyAudiences15({page,base,shots});
  await verifyClient15({page,base,shots});
  await verifyClient16({page,base,shots});
+ // Reset only the isolated fixture's rate counters before another release group.
+ // Production rate limiting remains enabled and unchanged.
+ const fixtureDb=new DatabaseSync(path.join(data,'facadepro.sqlite'));try{fixtureDb.exec('DELETE FROM rate_limits');}finally{fixtureDb.close();}
+ await verifyBrief17({page,base,shots});
+ await verifyBudget17({page,base,shots});
+ await verifyCalendar17({page,base,shots});
+ await verifyNavigation17({page,base,shots});
  for(const width of [390,320]){
   await page.setViewportSize({width,height:844});
   for(const route of ['/', '/compare.html?projects=museum,burny','/projects/museum.html','/request.html','/admin/']){

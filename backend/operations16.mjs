@@ -98,8 +98,13 @@ export function createOperations16({db,fail=defaultFail,text,transaction,hash,st
   });
  }
 
+ function calendar(){
+  const zone=timezone(),parts=new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(now())),get=key=>parts.find(part=>part.type===key).value;
+  return {today:[get('year'),get('month'),get('day')].join('-'),timezone:zone};
+ }
+
  function day(username){
-  username=user(username);const zone=timezone(),parts=new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(now())),get=key=>parts.find(part=>part.type===key).value,today=[get('year'),get('month'),get('day')].join('-');
+  username=user(username);const {today,timezone:zone}=calendar();
   const groups={},counts={};
   for(const [key,condition,args] of [['overdue',"status NOT IN ('won','closed') AND next_contact<>'' AND next_contact<?",[today]],['today',"status NOT IN ('won','closed') AND next_contact=?",[today]],['new',"status='new'",[]]]){
    const where='assignee=? AND '+condition;counts[key]=db.prepare('SELECT COUNT(*) n FROM leads WHERE '+where).get(username,...args).n;
@@ -131,5 +136,5 @@ export function createOperations16({db,fail=defaultFail,text,transaction,hash,st
    return {entry:callEntry(db.prepare('SELECT * FROM lead_calls16 WHERE id=?').get(id)),...state(lead(leadId)),duplicate:false};
   });
  }
- return {day,inbox,recordIncoming,markIncoming,unreadCounts,call};
+ return {calendar,day,inbox,recordIncoming,markIncoming,unreadCounts,call};
 }

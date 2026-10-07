@@ -16,7 +16,11 @@ def continuation(prefix):
 
 def enhance(g, route, body):
     if route in ('request.html', 'quote.html'):
-        body = body.replace('<input type="hidden" name="solution" value="">', '<input type="hidden" name="solution" value=""><input type="hidden" name="scope" value=""><div id="request-scope-context" class="solution-context" hidden></div>', 1)
+        body = body.replace('<input type="hidden" name="solution" value="">', '<input type="hidden" name="solution" value=""><div id="request-scope-context" class="solution-context" hidden></div>', 1)
+        scope = '<label class="request-scope-field">Формат участия<select name="scope"><option value="">Помогите определить состав работ</option><option value="installation">Только монтаж</option><option value="supply-installation">Поставка и монтаж</option><option value="engineering">Инженерная подготовка</option><option value="supply">Поставка конструкций</option><option value="height">Работы на высоте</option></select><span class="field-hint">Можно изменить выбранный на странице услуги формат.</span></label>'
+        body = body.replace('<div class="field-grid"><label>Тип объекта', scope+'<div class="field-grid"><label>Тип объекта', 1)
+        details = '<section class="request-object-details" aria-labelledby="object-details-heading"><h3 id="object-details-heading">Уточнения по объекту</h3><p class="field-hint">Заполните то, что уже известно. Это поможет подготовить предметное предложение.</p><ul id="request-data-hints" class="request-data-hints"></ul><label>Количество элементов, шт. <span class="optional">необязательно</span><input name="elementCount" type="number" min="1" max="100000" step="1" inputmode="numeric" placeholder="Например, 12 окон или стеклопакетов"><span class="field-hint">Укажите, если объём удобнее считать в окнах, проёмах или отдельных элементах.</span></label><label>Что важно учесть <span class="optional">необязательно</span><textarea name="objectDetails" rows="3" maxlength="1500" placeholder="Примерные размеры, состояние конструкций и условия доступа"></textarea></label></section>'
+        body = body.replace('<label>Документация<select', details+'<label>Документация<select', 1)
         body = body.replace('<div class="upload-zone" id="upload-zone">', LINK+'<div class="upload-zone" id="upload-zone">', 1)
         body = body.replace('<p class="form-status"', transfer('request')+'<p class="form-status"', 1)
         body = body.replace('<a class="text-button" id="after-submit"', continuation('request')+'<a class="text-button" id="after-submit"', 1)

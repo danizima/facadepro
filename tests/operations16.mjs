@@ -26,6 +26,20 @@ const options={db,fail,text,transaction:atomic,hash,staff,crm,timezone:()=>clock
 assert.equal(ops.inbox({username:'manager'}).total,0,'migration does not invent old incoming events');
 const initial=ops.day('manager');assert.equal(initial.today,'2026-10-08','calendar date uses configured timezone, not UTC');assert.deepEqual(initial.counts,{overdue:1,today:1,new:2,incoming:0});assert.equal(initial.groups.overdue[0].id,overdue);assert.equal(initial.groups.today[0].id,today);assert.equal(initial.groups.new.length,2);assert.deepEqual(Object.keys(initial.groups.new[0].payload),['name','company','phone','email','city','object']);assert.equal(initial.groups.new[0].payload.portalToken,undefined);assert.equal(initial.groups.new[0].payload.comment,undefined);
 clock.zone='America/Los_Angeles';assert.equal(ops.day('manager').today,'2026-10-07');assert.equal(ops.day('manager').counts.today,1);clock.zone='Asia/Vladivostok';
+// The shared calendar must match the daily queue at east/west midnight,
+// month/year rollover and leap day, independently of the process/browser zone.
+const clockBeforeCalendar={...clock};
+for(const [time,zone,expected] of [
+ ['2026-12-31T13:59:59.000Z','Asia/Vladivostok','2026-12-31'],
+ ['2026-12-31T14:00:00.000Z','Asia/Vladivostok','2027-01-01'],
+ ['2027-01-01T07:59:59.000Z','America/Los_Angeles','2026-12-31'],
+ ['2027-01-01T08:00:00.000Z','America/Los_Angeles','2027-01-01'],
+ ['2026-10-31T09:59:59.000Z','Pacific/Kiritimati','2026-10-31'],
+ ['2026-10-31T10:00:00.000Z','Pacific/Kiritimati','2026-11-01'],
+ ['2028-02-28T14:00:00.000Z','Asia/Vladivostok','2028-02-29'],
+ ['2028-02-29T14:00:00.000Z','Asia/Vladivostok','2028-03-01']
+]){clock.time=time;clock.zone=zone;assert.deepEqual(ops.calendar(),{today:expected,timezone:zone});const day=ops.day('manager');assert.equal(day.today,expected);assert.equal(day.timezone,zone);}
+Object.assign(clock,clockBeforeCalendar);
 assert.throws(()=>ops.day('unknown'),{status:403});assert.throws(()=>ops.inbox({username:'unknown'}),{status:403});
 
 let firstIncoming;const firstAddition=addition(newLead,'<img src=x onerror=alert(1)>','https://example.com/materials',2),before=db.prepare('SELECT revision FROM leads WHERE id=?').get(newLead).revision;

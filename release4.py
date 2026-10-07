@@ -27,7 +27,7 @@ def pages(g):
  page('portfolio.html','Собрать портфолио','Персональное PDF-портфолио ФАСАД.PRO: выберите подходящие объекты для заказчика или тендера.',body,'projects')
  body=intro('Подбор решения','С чего начинается<br>ваша задача?','Выберите ситуацию. Покажем подходящие направления, примеры работ и список материалов для первого разговора.')
  body+='<section class="section solution-section"><div class="solution-choices" role="group" aria-label="Ваша задача">'+''.join(f'<button type="button" data-solution="{s["id"]}" aria-pressed="false"><span class="solution-number">0{i+1}</span><strong>{s["title"]}</strong><span>{s["short"]}</span><span class="solution-arrow" aria-hidden="true">↗</span></button>' for i,s in enumerate(solutions))+'</div><div id="solution-result" hidden aria-live="polite"></div><noscript>Все направления доступны на <a href="services.html">странице услуг</a>.</noscript></section>'+data_element(payload)
- page('solutions.html','Подобрать решение','Подбор фасадных работ: остекление, ремонт, протечки, замена стеклопакетов и работы на высоте.',body,'services')
+ page('solutions.html','Подобрать решение','Выберите задачу: фасад, окна, монтаж закупленных конструкций, замеры, ремонт — или уточните направление с менеджером.',body,'services')
 
 def links(g):
  return '<section class="section project-tools-home"><div><p class="eyebrow">Ваш следующий объект</p><h2>Найдите похожий опыт.</h2><p>Посмотрите географию работ или соберите подборку для обсуждения с командой.</p></div><div>'+g['button']('Карта проектов','map.html')+g['button']('Собрать портфолио','portfolio.html')+'</div></section>'
