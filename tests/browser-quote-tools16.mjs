@@ -57,6 +57,8 @@ export async function verifyQuoteTools16({page,base,shots}) {
   assert.ok((await page.locator('#quote-template16-select option').allTextContents()).includes(templateName));
   await row.locator('[data-item-field=quantity]').fill('99');
   await page.locator('#quote-template16-apply').click();
+  await page.locator('#confirm-dialog').waitFor({state:'visible'});
+  await page.locator('#confirm-yes').click();
   assert.equal(await row.locator('[data-item-field=quantity]').inputValue(),'1.5');
   assert.equal(await builder.locator('[name=validUntil]').inputValue(),'');
   assert.equal(await builder.locator('[name=taxRate]').inputValue(),'22');

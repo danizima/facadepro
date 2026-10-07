@@ -15,7 +15,7 @@ export async function verifyRelease102({page,base,shots}) {
     if(width!==320)await page.screenshot({path:path.join(shots,'dvfu-'+width+'.png')});
   }
   await page.goto(base+'/request.html?project=dvfu',{waitUntil:'networkidle'});
-  await page.locator('.request-project-context').waitFor();
+  await page.locator('.request-project-context strong').waitFor();
   assert.ok(await page.locator('.request-project-context img').evaluate(img=>img.complete&&img.naturalWidth>0));
   await page.goto(base+'/compare.html?projects=dvfu,museum',{waitUntil:'networkidle'});
   await page.locator('.compare-mobile').waitFor();

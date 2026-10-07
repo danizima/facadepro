@@ -72,41 +72,64 @@
     });
   }
 
-  // References contain project IDs only. A customer's city and object type are never copied from the example.
-  if (form && (query.has('project') || query.has('compare'))) {
-    const single = query.get('project'), raw = single || query.get('compare') || '';
-    const ids = [...new Set(raw.split(','))];
-    if (ids.length <= 3 && ids.every(id => /^[a-z0-9-]{2,60}$/.test(id))) {
-      let edited = false;
-      const markEdited = () => { edited = true; };
-      form.addEventListener('input', markEdited, {once: true});
-      form.addEventListener('change', markEdited, {once: true});
-      projects().then(value => {
-        const chosen = ids.map(id => value.find(p => p.id === id)).filter(Boolean);
-        if (!chosen.length) return;
-        const panel = document.createElement('section'); panel.className = 'request-project-context';
-        panel.setAttribute('aria-label', 'Примеры для обсуждения');
-        const image = document.createElement('img'); image.src = asset(chosen[0]); image.alt = ''; image.width = 160; image.height = 120;
-        const copy = document.createElement('div'), label = document.createElement('p'), title = document.createElement('strong'), note = document.createElement('p'), remove = document.createElement('button');
-        label.className = 'eyebrow'; label.textContent = 'Пример для вашей задачи';
-        title.textContent = chosen.map(p => p.title).join(' · ');
-        note.textContent = 'Менеджер увидит выбранные проекты вместе с заявкой.';
-        remove.type = 'button'; remove.className = 'text-button'; remove.textContent = 'Убрать привязку ×';
-        const input = document.createElement('input'); input.type = 'hidden'; input.name = 'comparedProjects'; input.value = chosen.map(p => p.id).join(',');
-        remove.addEventListener('click', () => {
-          panel.remove(); input.remove(); form.dispatchEvent(new Event('input', {bubbles: true}));
-          const url = new URL(location.href); url.searchParams.delete('project'); url.searchParams.delete('compare');
-          try { if (window.facadeUpdateSearch) window.facadeUpdateSearch(url.searchParams.toString()); else history.replaceState(null, '', url); } catch {}
-          form.querySelector('input[name=service]')?.focus();
-        });
-        if (single && !edited && !query.has('service') && !query.has('solution')) {
-          form.querySelectorAll('input[name=service]').forEach(el => { el.checked = chosen[0].serviceIds?.includes(el.value) || false; });
-          note.textContent += ' Направления отмечены — их можно изменить.';
-        }
-        copy.append(label, title, note, remove); panel.append(image, copy); form.prepend(panel); form.append(input);
-        form.dispatchEvent(new Event('change', {bubbles: true}));
-      }).catch(() => {});
+  // Validate the current references, including a restored draft, against public data.
+  // The customer's fields remain independent from the selected example projects.
+  if (form) {
+    let edited = false, requested = [], state = 'ready', operation = 0, panel = null;
+    const markEdited = () => { edited = true; };
+    form.addEventListener('input', markEdited, {once: true});
+    form.addEventListener('change', markEdited, {once: true});
+    const parseIds = raw => {
+      if (typeof raw !== 'string' || !raw) return [];
+      const ids = [...new Set(raw.split(','))];
+      return ids.length <= 3 && ids.every(id => /^[a-z0-9-]{2,60}$/.test(id)) ? ids : [];
+    };
+    function writeURL(ids, preserveSingle = false) {
+      const url = new URL(location.href);
+      url.searchParams.delete('project'); url.searchParams.delete('compare');
+      if (ids.length) url.searchParams.set(preserveSingle && ids.length === 1 ? 'project' : 'compare', ids.join(','));
+      try { if (window.facadeUpdateSearch) window.facadeUpdateSearch(url.searchParams.toString()); else history.replaceState(null, '', url); } catch {}
     }
+    function field(ids) {
+      form.querySelectorAll('input[name="comparedProjects"]').forEach(input => input.remove());
+      if (!ids.length) return;
+      const input = document.createElement('input'); input.type = 'hidden'; input.name = 'comparedProjects'; input.value = ids.join(','); form.append(input);
+    }
+    function notify() { form.dispatchEvent(new Event('change', {bubbles: true})); }
+    function draw(rows = [], message = '', retry = false) {
+      panel?.remove(); panel = null;
+      if (!requested.length && !message) return;
+      panel = document.createElement('section'); panel.className = 'request-project-context';
+      panel.setAttribute('aria-label', 'Примеры для обсуждения'); panel.tabIndex = -1;
+      if (rows.length) { const img = document.createElement('img'); img.src = asset(rows[0]); img.alt = ''; img.width = 160; img.height = 120; panel.append(img); }
+      const copy = document.createElement('div'), label = document.createElement('p'), note = document.createElement('p');
+      label.className = 'eyebrow'; label.textContent = 'Пример для вашей задачи'; copy.append(label);
+      if (rows.length) { const title = document.createElement('strong'); title.textContent = rows.map(p => p.title).join(' · '); copy.append(title); }
+      note.setAttribute('role', 'status'); note.textContent = message || 'Менеджер увидит выбранные проекты вместе с заявкой.'; copy.append(note);
+      if (retry) { const button = document.createElement('button'); button.type = 'button'; button.className = 'text-button'; button.dataset.projectContextRetry = ''; button.textContent = 'Повторить проверку'; button.addEventListener('click', () => { projectsPromise = null; void apply(requested.join(','), {restored: true}); }); copy.append(button); }
+      if (requested.length) { const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'text-button'; remove.dataset.projectContextRemove = ''; remove.textContent = 'Убрать привязку ×'; remove.addEventListener('click', () => { edited = true; operation++; requested = []; state = 'ready'; field([]); draw(); writeURL([]); notify(); form.querySelector('input[name=service]')?.focus(); }); copy.append(remove); }
+      panel.append(copy); form.prepend(panel);
+    }
+    async function apply(raw, {restored = false, single = false} = {}) {
+      const version = ++operation; if (restored) edited = true;
+      requested = parseIds(raw); field(requested);
+      if (!requested.length) { state = 'ready'; draw(); if (restored || raw) writeURL([]); return; }
+      state = 'pending'; draw([], 'Проверяем выбранные проекты…');
+      if (restored) writeURL([]);
+      try {
+        const available = await projects(); if (version !== operation) return;
+        const chosen = requested.map(id => available.find(p => p.id === id && p.published !== false)).filter(Boolean), missing = chosen.length !== requested.length;
+        requested = chosen.map(p => p.id); state = 'ready'; field(requested);
+        if (single && chosen.length && !edited && !query.has('service') && !query.has('solution')) form.querySelectorAll('input[name=service]').forEach(input => { input.checked = chosen[0]?.serviceIds?.includes(input.value) || false; });
+        draw(chosen, missing ? 'Часть примеров больше не опубликована. В заявке останутся только доступные проекты.' : 'Менеджер увидит выбранные проекты вместе с заявкой.');
+        writeURL(requested, single && !restored); notify();
+      } catch {
+        if (version !== operation) return;
+        state = 'failed'; draw([], 'Не удалось проверить примеры проектов. Повторите проверку или уберите привязку, чтобы продолжить.', true);
+      }
+    }
+    form.facadeProjectContext = {restore: raw => { void apply(raw, {restored: true}); }, blocked: () => state !== 'ready'};
+    if (query.has('project') || query.has('compare')) void apply(query.get('project') || query.get('compare') || '', {single: Boolean(query.get('project'))});
   }
 
   document.querySelectorAll('[data-preparation]').forEach(panel => {

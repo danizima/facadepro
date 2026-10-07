@@ -31,7 +31,7 @@ export async function verifyRelease8({page, base, shots}) {
   await page.locator('.case-selection [data-select-compare=museum]').waitFor();
   await page.locator('.case-selection a').click();
 
-  await page.locator('.request-project-context').waitFor();
+  await page.locator('.request-project-context strong').waitFor();
   assert.equal(await page.locator('[name=comparedProjects]').inputValue(), 'museum');
   assert.equal(await page.locator('[name=object]').inputValue(), '');
   assert.equal(await page.locator('[name=city]').inputValue(), '');
@@ -85,7 +85,7 @@ export async function verifyRelease8({page, base, shots}) {
     await page.locator('[data-selection-link]').click();
     await page.locator('.compare-mobile').waitFor();
     await page.goto(base + '/request.html?project=museum', {waitUntil:'networkidle'});
-    await page.locator('.request-project-context').waitFor();
+    await page.locator('.request-project-context strong').waitFor();
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
     if(width===390) await page.locator('.request-project-context').screenshot({path:path.join(shots,'request-v8-mobile.png')});
     await page.goto(base + '/services/glazing.html', {waitUntil:'networkidle'});

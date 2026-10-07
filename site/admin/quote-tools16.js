@@ -83,10 +83,11 @@
           ctx.refreshDirty?.();message('#quote-template16-status','Список обновлён. Выберите шаблон заново, чтобы работать с его текущей редакцией.');
         }catch(error){message('#quote-template16-status',error.message,true);}
       };
-      query('#quote-template16-apply').onclick=()=>{
+      query('#quote-template16-apply').onclick=async()=>{
         if(!selected||busy)return;
         if(typeof ctx.applyQuoteDocument!=='function'){message('#quote-template16-status','Конструктор ещё загружается. Попробуйте снова.',true);return;}
-        ctx.applyQuoteDocument(structuredClone(selected.document));
+        const applied=await ctx.applyQuoteDocument(structuredClone(selected.document));
+        if(applied===false||!current())return;
         message('#quote-template16-status','Шаблон перенесён в конструктор. Проверьте объёмы, цены и условия перед созданием PDF.');
       };
       const save=async update=>{

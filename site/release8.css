@@ -27,6 +27,8 @@ body.selection-active{padding-bottom:210px}
 body.selection-active .mobile-actions{display:none}
 body.menu-open .selection-tray,body:has(dialog[open]) .selection-tray,body:has(.consent-banner:not([hidden])) .selection-tray,body.callback-in-view .selection-tray{visibility:hidden;pointer-events:none}
 .request-project-context{display:grid;grid-template-columns:120px minmax(0,1fr);gap:20px;padding:20px;background:#eeeeee;border-left:3px solid #5f5f5f;margin-bottom:30px}
+.request-project-context>div:only-child{grid-column:1/-1}
+.request-project-context [data-project-context-retry],.selection-context [data-selection-context-retry]{margin-inline-end:18px}
 .request-project-context img{width:120px;height:100px;object-fit:cover}.request-project-context strong{font-size:18px;line-height:1.35;display:block;margin:10px 0}
 .request-project-context p:not(.eyebrow){font-size:13px;line-height:1.6}.request-project-context .text-button{font-size:12px;min-height:44px}.request-project-context .eyebrow{font-size:10px;margin:0}
 .preparation-list{border:1px solid #cacaca;background:#f3f3f3;padding:20px;margin:24px 0;color:#383838}
