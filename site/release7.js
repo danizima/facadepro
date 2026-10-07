@@ -6,10 +6,10 @@
  const callbackSection=document.querySelector('.callback-section');
  if(callbackSection&&'IntersectionObserver' in window)new IntersectionObserver(entries=>document.body.classList.toggle('callback-in-view',entries[0].isIntersecting),{threshold:0}).observe(callbackSection);
  document.querySelectorAll('.callback-form').forEach(form=>{
-  const status=form.querySelector('.callback-status'),button=form.querySelector('[type=submit]');let key=window.facade.uuid(),busy=false;
-  form.addEventListener('input',()=>{if(!busy)key=window.facade.uuid();});
+  const status=form.querySelector('.callback-status'),button=form.querySelector('[type=submit]');let key=window.facade.uuid(),busy=false,sourcePage='';
+  form.addEventListener('input',event=>{if(!busy&&event.target.name!=='consent'){key=window.facade.uuid();sourcePage='';}});
   form.addEventListener('submit',async event=>{event.preventDefault();if(busy||!form.reportValidity())return;busy=true;button.disabled=true;status.textContent='Отправляем…';
-   try{if(!await window.facade.ready)throw Error('Отправка сейчас недоступна. Позвоните по номеру внизу страницы.');const values=Object.fromEntries(new FormData(form)),r=await fetch('/api/callback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...values,consent:form.elements.consent.checked?'yes':'',idempotency:key,sourcePage:window.facade.attribution(),analyticsSession:window.facade.getSession()})});const result=await r.json();if(!r.ok)throw Error(result.error||'Не удалось отправить обращение.');status.textContent='Запрос '+result.reference+' получен. Менеджер свяжется с вами для уточнения задачи.';form.reset();key=window.facade.uuid();status.focus();}
+   try{if(!await window.facade.ready)throw Error('Отправка сейчас недоступна. Позвоните по номеру внизу страницы.');const values=Object.fromEntries(new FormData(form)),attribution=window.facade.marketingAttribution?.();sourcePage=sourcePage||window.facade.attribution();const r=await fetch('/api/callback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...values,consent:form.elements.consent.checked?'yes':'',idempotency:key,sourcePage,analyticsSession:window.facade.getSession(),...(attribution?{attribution:JSON.stringify(attribution)}:{})})});const result=await r.json();if(!r.ok)throw Error(result.error||'Не удалось отправить обращение.');status.textContent='Запрос '+result.reference+' получен. Менеджер свяжется с вами для уточнения задачи.';form.reset();key=window.facade.uuid();sourcePage='';status.focus();}
    catch(error){status.textContent=error.message;status.focus();}finally{busy=false;button.disabled=false;}
   });
  });

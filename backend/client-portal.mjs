@@ -1,10 +1,11 @@
 import {randomBytes,randomUUID} from 'node:crypto';
-import {writeFile,rm} from 'node:fs/promises';
+import {writeFile,rm,lstat} from 'node:fs/promises';
 import path from 'node:path';
 
 const LIFETIME=90*86400000;
 const ID=/^[a-f0-9-]{36}$/;
 const TOKEN=/^[a-f0-9]{64}$/;
+const QUOTE_ID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const FILE_TYPES=new Set(['pdf','jpg','jpeg','png','webp','zip','docx','xlsx','dwg','dxf','txt']);
 const STATUS_LABELS={new:'Получена',review:'В работе',estimate:'Готовим предложение',sent:'Предложение подготовлено',won:'Договор',closed:'Обращение завершено'};
 const DEFAULT_MESSAGES={new:'Менеджер свяжется с вами для уточнения деталей.',review:'Уточняем состав работ и исходные данные.',estimate:'Готовим коммерческое предложение.',sent:'Обсудим предложение и ответим на ваши вопросы.',won:'Согласуем следующий этап работ.',closed:'Обращение завершено. Свяжитесь с менеджером, если появились новые вопросы.'};
@@ -22,10 +23,15 @@ const DEFAULT_MESSAGES={new:'Менеджер свяжется с вами дл�
  * POST same: adminAction(id,{action,customerMessage,revision}), with CSRF.
  * Tokens belong in /followup.html#token and Bearer headers, never a query/path.
  * Append file IDs use the existing private /api/admin/files/:id route only.
+ * Initialize quote_versions before this factory. Only publishQuote exposes a
+ * chosen PDF. Client GET/HEAD downloads do not record a view automatically;
+ * an explicit same-origin POST calls quoteViewed after the PDF-open action.
  */
-export function createClientPortal({db,DATA,hash,privateHash,text,fail,content,transaction,signature,onAddition,now=Date.now,fileLimit=10*1024*1024,totalLimit=25*1024*1024,maxFiles=5}){
+export function createClientPortal({db,DATA,hash,privateHash,text,fail,content,transaction,signature,onAddition,onManagerAction,now=Date.now,fileLimit=10*1024*1024,totalLimit=25*1024*1024,maxFiles=5}){
  if(typeof privateHash!=='function'||typeof signature!=='function')throw new TypeError('Portal requires keyed privateHash and the existing attachment signature validator.');
  if(onAddition!==undefined&&typeof onAddition!=='function')throw new TypeError('Portal onAddition must be a synchronous function.');
+ if(onManagerAction!==undefined&&typeof onManagerAction!=='function')throw new TypeError('Portal onManagerAction must be a synchronous function.');
+ const managerAction=event=>{if(onManagerAction&&event.username){const result=onManagerAction(event);if(result&&typeof result.then==='function')throw new TypeError('Portal onManagerAction must record history synchronously.');}};
  db.exec(`
   CREATE TABLE IF NOT EXISTS lead_portals(
    lead_id TEXT PRIMARY KEY REFERENCES leads(id) ON DELETE CASCADE,
@@ -43,6 +49,24 @@ export function createClientPortal({db,DATA,hash,privateHash,text,fail,content,t
    file_id TEXT PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE
   );
   CREATE INDEX IF NOT EXISTS lead_additions_lead ON lead_additions(lead_id,created_at);
+  CREATE TABLE IF NOT EXISTS lead_quote_publications(
+   lead_id TEXT PRIMARY KEY REFERENCES leads(id) ON DELETE CASCADE,
+   quote_id TEXT REFERENCES quote_versions(id) ON DELETE SET NULL,
+   published_at TEXT NOT NULL DEFAULT '',first_viewed_at TEXT NOT NULL DEFAULT '',
+   last_viewed_at TEXT NOT NULL DEFAULT '',view_count INTEGER NOT NULL DEFAULT 0,
+   revision INTEGER NOT NULL DEFAULT 1
+  );
+  CREATE TABLE IF NOT EXISTS quote_client_approvals(
+   quote_id TEXT PRIMARY KEY REFERENCES quote_versions(id) ON DELETE CASCADE,
+   lead_id TEXT NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+   first_published_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS lead_quote_views(
+   lead_id TEXT NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+   quote_id TEXT NOT NULL REFERENCES quote_versions(id) ON DELETE CASCADE,
+   publication_revision INTEGER NOT NULL,portal_generation TEXT NOT NULL,viewed_at TEXT NOT NULL,
+   PRIMARY KEY(lead_id,publication_revision,portal_generation)
+  );
  `);
  const runTransaction=transaction||((fn)=>{db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(error){db.exec('ROLLBACK');throw error;}});
  const unavailable=()=>fail(404,'Ссылка недоступна или срок её действия завершён. Свяжитесь с менеджером.');
@@ -58,7 +82,7 @@ export function createClientPortal({db,DATA,hash,privateHash,text,fail,content,t
   return row;
  }
  function issuance(row){return {continuationUrl:active(row)?'/followup.html#'+tokenFor(row):null,continuationExpiresAt:new Date(row.expires).toISOString()};}
- function issue(leadId,{rotate=false,customerMessage}={}){
+ function issue(leadId,{rotate=false,customerMessage,username=''}={}){
   lead(leadId);
   const message=customerMessage===undefined?undefined:text(customerMessage,2000);
   return runTransaction(()=>{
@@ -71,6 +95,7 @@ export function createClientPortal({db,DATA,hash,privateHash,text,fail,content,t
     else db.prepare('UPDATE lead_portals SET generation=?,token_hash=?,created_at=?,expires=?,revoked=0,customer_message=?,revision=revision+1 WHERE lead_id=?').run(generation,hash(token),createdAt,expires,message??row.customer_message,leadId);
     db.prepare('UPDATE leads SET revision=revision+1 WHERE id=?').run(leadId);
     row=portalRow(leadId);
+    managerAction({leadId,type:'portal',text:'Создана новая личная ссылка заказчика.',username,fromStatus:lead(leadId).status,toStatus:lead(leadId).status});
    }
    return issuance(row);
   });
@@ -84,33 +109,113 @@ export function createClientPortal({db,DATA,hash,privateHash,text,fail,content,t
  function read(token){
   const row=authorize(token),request=lead(row.lead_id),settings=content().settings;
   const status=Object.hasOwn(STATUS_LABELS,request.status)?request.status:'review';
+  const quote=clientQuote(row.lead_id);
   return {
    reference:request.reference,status,statusLabel:STATUS_LABELS[status],
    manager:{name:settings.manager,phone:settings.phone,email:settings.email},
-   customerMessage:row.customer_message||DEFAULT_MESSAGES[status],expiresAt:new Date(row.expires).toISOString(),updates:additions(row.lead_id)
+   customerMessage:row.customer_message||DEFAULT_MESSAGES[status],expiresAt:new Date(row.expires).toISOString(),updates:additions(row.lead_id),...(quote?{quote}:{})
   };
  }
  function admin(leadId){
   const request=lead(leadId),row=portalRow(leadId);
-  return {active:active(row),expiresAt:row?new Date(row.expires).toISOString():null,customerMessage:row?.customer_message||'',revision:row?.revision||0,leadRevision:request.revision,updates:additions(leadId,true)};
+  return {active:active(row),expiresAt:row?new Date(row.expires).toISOString():null,customerMessage:row?.customer_message||'',revision:row?.revision||0,leadRevision:request.revision,leadStatus:request.status,updates:additions(leadId,true),quotePublication:publication(leadId)};
  }
- function adminAction(leadId,input){
+ function adminAction(leadId,input,username=''){
   lead(leadId);
-  if(!input||typeof input!=='object'||!['issue','revoke','message'].includes(input.action))throw fail(422,'Выберите действие со ссылкой.');
+  if(!input||typeof input!=='object'||!['issue','revoke','message','publishQuote','withdrawQuote'].includes(input.action))throw fail(422,'Выберите действие со ссылкой.');
+  if(['publishQuote','withdrawQuote'].includes(input.action)&&(!Number.isSafeInteger(input.revision)||input.revision<1))throw fail(422,'Обновите карточку доступа перед публикацией КП.');
   const row=portalRow(leadId);
   if(input.revision!==undefined&&input.revision!==(row?.revision||0))throw fail(409,'Доступ к заявке изменён. Обновите карточку.');
   const message=input.customerMessage===undefined?undefined:text(input.customerMessage,2000);
   if(input.action==='issue'){
-   const result=issue(leadId,{rotate:true,customerMessage:message});
+   const result=issue(leadId,{rotate:true,customerMessage:message,username});
    return {...admin(leadId),url:result.continuationUrl};
   }
   if(!row)throw fail(404,'Ссылка ещё не создана.');
+  if(input.action==='publishQuote'||input.action==='withdrawQuote')return changePublication(leadId,input,username);
   if(input.action==='message'&&message===undefined)throw fail(422,'Укажите следующий шаг для заказчика.');
+  const changed=(input.action==='revoke'&&!row.revoked)||(message!==undefined&&message!==row.customer_message);
+  if(!changed)return admin(leadId);
   runTransaction(()=>{
    db.prepare('UPDATE lead_portals SET revoked=?,customer_message=?,revision=revision+1 WHERE lead_id=?').run(input.action==='revoke'?1:row.revoked,message??row.customer_message,leadId);
    db.prepare('UPDATE leads SET revision=revision+1 WHERE id=?').run(leadId);
+   managerAction({leadId,type:'portal',text:input.action==='revoke'?'Личная ссылка заказчика отозвана.':'Сообщение для заказчика обновлено.',username,fromStatus:lead(leadId).status,toStatus:lead(leadId).status});
   });
   return admin(leadId);
+ }
+ const quotesInitialized=()=>Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='quote_versions'").get());
+ function publicationRow(leadId){
+  if(!quotesInitialized())return null;
+  return db.prepare(`SELECT p.*,q.version,q.name,q.size,q.amount_kopecks,q.timeframe,q.archived,q.file_key
+   FROM lead_quote_publications p JOIN quote_versions q ON q.id=p.quote_id AND q.lead_id=p.lead_id
+   WHERE p.lead_id=?`).get(leadId)||null;
+ }
+ function publication(leadId){
+  const row=publicationRow(leadId);if(!row)return null;
+  return {quoteId:row.quote_id,version:row.version,publishedAt:row.published_at,firstViewedAt:row.first_viewed_at||null,lastViewedAt:row.last_viewed_at||null,viewCount:row.view_count,revision:row.revision,archived:Boolean(row.archived)};
+ }
+ function clientQuote(leadId){
+  const row=publicationRow(leadId);if(!row||row.archived)return null;
+  return {id:row.quote_id,version:row.version,name:row.name,size:row.size,amount:Math.floor(row.amount_kopecks/100)+'.'+String(row.amount_kopecks%100).padStart(2,'0'),timeframe:row.timeframe,publishedAt:row.published_at,downloadApi:'/api/client/lead/quotes/'+row.quote_id+'/file',viewApi:'/api/client/lead/quotes/'+row.quote_id+'/view'};
+ }
+ function changePublication(leadId,input,username=''){
+  return runTransaction(()=>{
+   const priorLead=lead(leadId);const row=portalRow(leadId);
+   if(input.revision!==undefined&&input.revision!==row.revision)throw fail(409,'Доступ к заявке изменён. Обновите карточку.');
+   if(input.action==='publishQuote'){
+    if(!active(row))throw fail(422,'Сначала создайте действующую личную ссылку заказчика.');
+    if(typeof input.quoteId!=='string'||!QUOTE_ID.test(input.quoteId)||!quotesInitialized())throw fail(404,'КП не найдено.');
+    const quote=db.prepare('SELECT id,archived FROM quote_versions WHERE lead_id=? AND id=?').get(leadId,input.quoteId);
+    if(!quote)throw fail(404,'КП не найдено.');
+    if(quote.archived)throw fail(422,'Верните КП из архива перед публикацией.');
+    const current=publicationRow(leadId);if(current?.quote_id===quote.id)return admin(leadId);
+    const publishedAt=new Date(now()).toISOString();
+    db.prepare(`INSERT INTO lead_quote_publications(lead_id,quote_id,published_at) VALUES(?,?,?)
+     ON CONFLICT(lead_id) DO UPDATE SET quote_id=excluded.quote_id,published_at=excluded.published_at,
+     first_viewed_at='',last_viewed_at='',view_count=0,revision=lead_quote_publications.revision+1`).run(leadId,quote.id,publishedAt);
+    db.prepare('INSERT OR IGNORE INTO quote_client_approvals(quote_id,lead_id,first_published_at) VALUES(?,?,?)').run(quote.id,leadId,publishedAt);
+    db.prepare("UPDATE leads SET status=CASE WHEN status IN ('won','closed') THEN status ELSE 'sent' END,revision=revision+1 WHERE id=?").run(leadId);
+   }else{
+    const current=publicationRow(leadId);if(!current)return admin(leadId);
+    db.prepare("UPDATE lead_quote_publications SET quote_id=NULL,revision=revision+1 WHERE lead_id=?").run(leadId);
+    db.prepare('UPDATE leads SET revision=revision+1 WHERE id=?').run(leadId);
+   }
+   db.prepare('UPDATE lead_portals SET revision=revision+1 WHERE lead_id=?').run(leadId);
+   managerAction({leadId,type:input.action==='publishQuote'?'quote_published':'portal',text:input.action==='publishQuote'?'Версия КП опубликована в личной странице заказчика.':'КП снято с личной страницы заказчика.',username,fromStatus:priorLead.status,toStatus:lead(leadId).status});
+   return admin(leadId);
+  });
+ }
+ function authorizedQuote(token,quoteId){
+  const portal=authorize(token);
+  if(typeof quoteId!=='string'||!QUOTE_ID.test(quoteId))throw fail(404,'КП недоступно.');
+  const quote=publicationRow(portal.lead_id);
+  if(!quote||quote.archived||quote.quote_id!==quoteId)throw fail(404,'КП недоступно.');
+  return {portal,quote};
+ }
+ function quoteViewed(token,quoteId){
+  return runTransaction(()=>{
+   const {portal,quote}=authorizedQuote(token,quoteId);
+   const prior=db.prepare('SELECT viewed_at FROM lead_quote_views WHERE lead_id=? AND publication_revision=? AND portal_generation=?').get(portal.lead_id,quote.revision,portal.generation);
+   if(prior)return {received:true,recorded:false,viewedAt:prior.viewed_at};
+   const viewedAt=new Date(now()).toISOString();
+   db.prepare('INSERT INTO lead_quote_views VALUES(?,?,?,?,?)').run(portal.lead_id,quoteId,quote.revision,portal.generation,viewedAt);
+   db.prepare("UPDATE lead_quote_publications SET first_viewed_at=CASE WHEN first_viewed_at='' THEN ? ELSE first_viewed_at END,last_viewed_at=?,view_count=view_count+1 WHERE lead_id=?").run(viewedAt,viewedAt,portal.lead_id);
+   db.prepare('UPDATE leads SET revision=revision+1 WHERE id=?').run(portal.lead_id);
+   return {received:true,recorded:true,viewedAt};
+  });
+ }
+ async function quoteDownload(token,quoteId,{recordView=false}={}){
+  const {quote}=authorizedQuote(token,quoteId);
+  if(quote.file_key!=='quotes/'+quoteId+'.pdf')throw fail(404,'Файл КП недоступен.');
+  const file=path.join(DATA,quote.file_key);let info;
+  try{info=await lstat(file);}catch{throw fail(404,'Файл КП недоступен.');}
+  if(!info.isFile()||info.isSymbolicLink()||info.size!==quote.size)throw fail(404,'Файл КП недоступен.');
+  // Expiry, revocation, archiving or publication replacement during the async
+  // filesystem check must deny access before any response starts streaming.
+  const latest=authorizedQuote(token,quoteId);
+  if(latest.quote.revision!==quote.revision)throw fail(404,'КП обновлено. Откройте личную страницу снова.');
+  if(recordView)quoteViewed(token,quoteId);
+  return {path:file,name:quote.name,size:quote.size,mime:'application/pdf'};
  }
  function validateProjectLink(value){
   const link=text(value||'',2000);if(!link)return '';
@@ -162,5 +267,5 @@ export function createClientPortal({db,DATA,hash,privateHash,text,fail,content,t
    return receipt(result.saved,result.replayed);
   }catch(error){if(!committed)for(const id of written)await rm(path.join(DATA,'uploads',id),{force:true});throw error;}
  }
- return {issue,read,append,admin,adminAction,authorize,tokenFromHeader};
+ return {issue,read,append,admin,adminAction,authorize,tokenFromHeader,quoteDownload,quoteViewed};
 }

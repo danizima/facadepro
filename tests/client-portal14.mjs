@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {createHash,createHmac,randomUUID} from 'node:crypto';
 import {createClientPortal} from '../backend/client-portal.mjs';
+import {initializeQuotes} from '../backend/quotes14.mjs';
 
 const DATA=await mkdtemp(path.join(tmpdir(),'facade-client-portal14-'));
 const db=new DatabaseSync(':memory:');
@@ -29,6 +30,7 @@ try{
   CREATE TABLE files(id TEXT PRIMARY KEY,lead_id TEXT REFERENCES leads(id) ON DELETE CASCADE,name TEXT,size INTEGER,ext TEXT);
   CREATE TABLE test_notifications(addition_id TEXT PRIMARY KEY,lead_id TEXT REFERENCES leads(id) ON DELETE CASCADE);
  `);
+ initializeQuotes(db);
  const firstLead=addLead(),secondLead=addLead(),portal=createClientPortal(dependencies);
  rejected(()=>createClientPortal({...dependencies,privateHash:undefined}),undefined);
  rejected(()=>createClientPortal({...dependencies,signature:undefined}),undefined);

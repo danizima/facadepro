@@ -13,6 +13,11 @@ import {verifyRelease13} from './browser13.mjs';
 import {verifyRelease14} from './browser14.mjs';
 import {verifyBudget14} from './browser-budget14.mjs';
 import {verifyCRM14} from './browser-crm14.mjs';
+import {verifyCRM15} from './browser-crm15.mjs';
+import {verifySales15} from './browser-sales15.mjs';
+import {verifyDrafts15} from './browser-drafts15.mjs';
+import {verifyAudiences15} from './browser-audiences15.mjs';
+import {verifyClient15} from './browser-client15.mjs';
 import {verifyRelease11} from './browser11.mjs';
 import {verifyRelease103} from './browser103.mjs';
 const require=createRequire(import.meta.url),{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
@@ -54,6 +59,11 @@ try{
  await verifyRelease14({page,base,shots});
  await verifyBudget14({page,base,shots});
  await verifyCRM14({page,base,shots});
+ await verifyCRM15({page,base,shots});
+ await verifySales15({page,base,shots});
+ await verifyDrafts15({page,base,shots});
+ await verifyAudiences15({page,base,shots});
+ await verifyClient15({page,base,shots});
  for(const width of [390,320]){
   await page.setViewportSize({width,height:844});
   for(const route of ['/', '/compare.html?projects=museum,burny','/projects/museum.html','/request.html','/admin/']){

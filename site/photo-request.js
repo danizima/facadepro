@@ -53,12 +53,14 @@
     if(!form.reportValidity())return;
     const phone=form.elements.phone.value;
     if(!/^[+\d\s().-]+$/.test(phone)||phone.replace(/\D/g,'').length<7||phone.replace(/\D/g,'').length>15){status.textContent='Проверьте номер телефона.';form.elements.phone.focus();return;}
-    const payload=new FormData(form);payload.set('consent','yes');payload.set('idempotency',key);payload.set('sourcePage',window.facade.attribution());payload.set('analyticsSession',window.facade.getSession());
+    const payload=new FormData(form);payload.set('consent','yes');payload.set('idempotency',key);payload.set('sourcePage',window.facade.attribution());payload.set('analyticsSession',window.facade.getSession());const attribution=window.facade.marketingAttribution();if(attribution)payload.set('attribution',JSON.stringify(attribution));
     if(project)payload.set('project',project.id);
     photos.forEach(row=>payload.append('files',row.file,row.file.name));
     busy=true;fieldset.disabled=true;status.textContent='Отправляем фотографии…';
     try{
+      const ticket=await window.facade.submissions.prepare('photo',payload,photos.map(row=>row.file),key);key=ticket.key;payload.set('idempotency',ticket.key);payload.set('sourcePage',ticket.sourcePage);payload.set('analyticsSession',ticket.analyticsSession);payload.delete('attribution');if(ticket.attribution&&window.facade.marketingAttribution())payload.set('attribution',JSON.stringify(ticket.attribution));
       const result=await upload(payload);showContinuation(result.continuationUrl);
+      window.facade.submissions.clear('photo');
       document.querySelector('#photo-reference').textContent='Обращение '+result.reference+' · фотографий: '+photos.length;
       photos.forEach(row=>URL.revokeObjectURL(row.url));photos=[];draw();form.reset();form.hidden=true;success.hidden=false;success.focus();status.textContent='';
     }catch(error){status.textContent=error.name==='TimeoutError'?'Отправка заняла больше времени. Фотографии остались в форме — повторите попытку.':error instanceof TypeError?'Связь прервалась. Фотографии остались в форме — повторите отправку.':error.message;status.focus();}

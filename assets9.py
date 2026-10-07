@@ -2,7 +2,7 @@
 import hashlib
 from pathlib import Path
 
-CSS=['styles.css','enhancements.css','business.css','release4.css','visual5.css','museum.css','release6.css','release7.css','release8.css','release9.css','visual10.css','release103.css','release11.css','release12.css','release13.css','services14.css','followup14.css','budget14.css']
+CSS=['styles.css','enhancements.css','business.css','release4.css','visual5.css','museum.css','release6.css','release7.css','release8.css','release9.css','visual10.css','release103.css','release11.css','release12.css','release13.css','services14.css','followup14.css','budget14.css','drafts15.css','audiences15.css']
 
 
 def write_bundle(g,names,extension):
@@ -28,5 +28,6 @@ def assets(g,route,body,base):
     if 'callback-form' in body or route=='compare.html':scripts.append('release7.js')
     if 'id="release8-data"' in body:scripts.append('release8.js')
     if 'id="contractor-kit"' in body:scripts.append('release9.js')
+    if route in ('for-contractors.html','for-owners.html','request.html','quote.html','photo-request.html'):scripts.append('audiences15.js')
     css=write_bundle(g,CSS,'css');js=write_bundle(g,scripts,'js')
     return f'<link rel="stylesheet" href="{base}{css}"><script src="{base}{js}" defer></script>'
