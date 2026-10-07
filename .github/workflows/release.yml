@@ -32,6 +32,20 @@ jobs:
         run: npm test
       - name: Build production image
         run: docker build -t facadepro-ci:${{ github.sha }} .
+      - name: Check production container startup
+        run: |
+          docker run --detach --name facadepro-ci-smoke --publish 127.0.0.1:18080:8080 --env PUBLIC_URL=http://127.0.0.1:18080 --env SMTP_HOST= --env SMTP_FROM= --env TELEGRAM_BOT_TOKEN= --env TELEGRAM_CHAT_ID= facadepro-ci:${{ github.sha }}
+          trap 'docker logs facadepro-ci-smoke; docker rm --force --volumes facadepro-ci-smoke' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --max-time 2 http://127.0.0.1:18080/healthz > "$RUNNER_TEMP/facadepro-container-health.json"; then
+              node --input-type=module -e 'import fs from "node:fs"; import assert from "node:assert/strict"; const health=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/facadepro-container-health.json")); const pkg=JSON.parse(fs.readFileSync("package.json")); assert.deepEqual(health,{ok:true,version:pkg.version});'
+              curl --fail --silent --max-time 10 http://127.0.0.1:18080/ > "$RUNNER_TEMP/facadepro-container-home.html"
+              node --input-type=module -e 'import fs from "node:fs"; import assert from "node:assert/strict"; const home=fs.readFileSync(process.env.RUNNER_TEMP+"/facadepro-container-home.html","utf8"); assert.ok(home.includes("visual21-hero")); assert.ok(home.includes("brand-note"));'
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
       - name: Install pinned browser test tools
         run: npm install --prefix "$RUNNER_TEMP/facade-browser" playwright@1.62.1 @sparticuz/chromium@153.0.0 --no-audit --no-fund
       - name: Check desktop and mobile flows
