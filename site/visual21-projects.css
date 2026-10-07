@@ -1,0 +1,563 @@
+/* Public portfolio and competencies: photography, clear reading order and fine rules. */
+body[data-page="projects.html"] .project-subnav{flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;gap:8px;padding-block:9px}
+body[data-page="projects.html"] .project-subnav>a{flex-shrink:0;border-radius:0}
+body[data-page="projects.html"] .page-intro>.eyebrow{margin-bottom:18px}
+body[data-page="projects.html"] .intro-grid{gap:20px 7vw}
+body[data-page^="projects/"] .case-story-index,body[data-page="solutions.html"] .solution-number{color:var(--mute)}
+body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 64px 38px;
+}
+body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-card {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  grid-column: auto;
+}
+body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-image,
+body[data-page="projects.html"] .editorial-grid .project-card[data-slot] .project-image {
+  aspect-ratio: 1.4;
+  border-radius: 0;
+  background: var(--soft);
+}
+body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-tag {
+  top: 18px;
+  left: 18px;
+  padding: 10px 13px;
+  background: var(--paper);
+  border-radius: 0;
+  font-size: 12px;
+}
+body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-arrow {
+  right: 18px;
+  bottom: 18px;
+  border-radius: 0;
+  width: 48px;
+  height: 48px;
+  background: var(--paper);
+}
+body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-meta {
+  margin-top: 24px;
+  font-size: 11px;
+  color: var(--mute);
+  letter-spacing: .075em;
+}
+body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-card h3 {
+  font-size: clamp(27px, 2.8vw, 42px);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -.045em;
+  margin-top: 13px;
+  max-width: 580px;
+}
+body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-work {
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--mute);
+  margin: 19px 0;
+}
+body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-directions {
+  gap: 6px 16px;
+  margin: 18px 0;
+}
+body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-directions a {
+  padding: 5px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  min-height: 36px;
+  background: transparent;
+  font-size: 12px;
+}
+body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-card-actions {
+  padding-top: 15px;
+  gap: 12px 18px;
+}
+body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-select {
+  border-radius: 0;
+  border-color: var(--line);
+  min-height: 44px;
+  padding: 11px 14px;
+  font-size: 12px;
+}
+body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-select[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* A quiet filter workspace, visually separate from the project photographs. */
+body[data-page="projects.html"] .page-intro {
+  padding-top: 35px;
+  padding-bottom: 37px;
+}
+body[data-page="projects.html"] .intro-grid h1 {
+  font-size: clamp(43px, 5.1vw, 74px);
+  line-height: 1.04;
+  letter-spacing: -.05em;
+}
+body[data-page="projects.html"] .catalog-section { padding-top: 18px; }
+body[data-page="projects.html"] .catalog-tools {
+  border: 0;
+  border-block: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  padding: 23px 0 18px;
+  margin-bottom: 38px;
+  column-gap: 36px;
+}
+body[data-page="projects.html"] .filter-list {
+  gap: 8px;
+  margin-bottom: 21px;
+}
+body[data-page="projects.html"] .filter-button {
+  border: 1px solid var(--line);
+  border-radius: 0;
+  min-height: 46px;
+  padding: 11px 16px;
+  font-size: 13px;
+  background: transparent;
+}
+body[data-page="projects.html"] .filter-button[aria-pressed="true"] {
+  border-color: var(--ink);
+  color: var(--paper);
+  background: var(--ink);
+}
+body[data-page="projects.html"] :is(.search-field input, .catalog-refine select) {
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--paper);
+  padding: 15px 16px;
+  min-height: 52px;
+}
+body[data-page="projects.html"] .search-field > span,
+body[data-page="projects.html"] .catalog-refine label { font-size: 12px; }
+body[data-page="projects.html"] .catalog-status {
+  border-color: var(--line);
+  padding-top: 12px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--mute);
+}
+
+/* Project pages retain the entire photograph in galleries and detail views. */
+body[data-page^="projects/"] :is(.case-intro, .museum-opening) {
+  padding-top: 29px;
+  padding-bottom: 29px;
+}
+body[data-page^="projects/"] :is(.case-intro, .museum-opening) .breadcrumbs {
+  margin-bottom: 30px;
+  font-size: 12px;
+}
+body[data-page^="projects/"] :is(.case-intro h1, .museum-heading h1) {
+  font-size: clamp(46px, 5.8vw, 88px);
+  line-height: 1.015;
+  letter-spacing: -.06em;
+  max-width: 1100px;
+  text-wrap: balance;
+}
+body[data-page^="projects/"] .case-intro-bottom {
+  margin-top: 22px;
+  font-size: 14px;
+}
+body[data-page^="projects/"] .case-scope-lead {
+  margin-top: 22px;
+  font-size: 16px;
+  line-height: 1.7;
+  max-width: 750px;
+}
+body[data-page^="projects/"] .project-brief {
+  padding-block: 28px;
+  background: var(--soft);
+  gap: 32px;
+  border-color: var(--line);
+}
+body[data-page^="projects/"] .project-brief-result { border-color: var(--line); }
+body[data-page^="projects/"] .project-brief-result > p:last-child {
+  margin-top: 12px;
+  color: var(--mute);
+  font-size: 15px;
+  line-height: 1.7;
+}
+body[data-page^="projects/"] .museum-heading {
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, .8fr);
+  gap: 6vw;
+  margin-top: 25px;
+}
+body[data-page^="projects/"] .museum-heading > div p { font-size: 17px; }
+body[data-page^="projects/"] .museum-cover {
+  border-radius: 0;
+  background: var(--soft);
+}
+body[data-page^="projects/"] .museum-cover-metric {
+  border-radius: 0;
+  background: var(--paper);
+}
+body[data-page^="projects/"] .case-selection {
+  padding-bottom: 25px;
+  gap: 18px 28px;
+}
+body[data-page^="projects/"] :is(.case-page-nav, .museum-nav) {
+  background: transparent;
+  border-color: var(--line);
+  gap: 8px 23px;
+}
+body[data-page^="projects/"] :is(.case-page-nav, .museum-nav) a {
+  padding: 10px 0;
+  border-radius: 0;
+  font-size: 13px;
+  min-height: 44px;
+  border-bottom: 1px solid transparent;
+}
+body[data-page^="projects/"] :is(.case-page-nav, .museum-nav) a:is([aria-current="location"], :hover) {
+  background: transparent;
+  border-bottom-color: var(--ink);
+}
+body[data-page^="projects/"] .visual-gallery {
+  margin-inline: var(--gutter);
+  background: var(--soft);
+}
+body[data-page^="projects/"] .visual-gallery .gallery-stage {
+  border-radius: 0;
+  background: var(--soft);
+  height: min(58vw, 760px);
+}
+body[data-page^="projects/"] .visual-gallery .gallery-stage > img {
+  width: 100%;
+  height: 100%;
+  object-fit: scale-down;
+  object-position: center;
+}
+body[data-page^="projects/"] .visual-gallery .gallery-zoom {
+  border-radius: 0;
+  right: 22px;
+  top: 22px;
+  background: var(--paper);
+}
+body[data-page^="projects/"] .gallery-ribbon {
+  background: var(--paper);
+  padding-inline: 0;
+  padding-block: 24px;
+}
+body[data-page^="projects/"] .gallery-ribbon .gallery-thumb {
+  border-radius: 0;
+  width: 88px;
+  flex-basis: 88px;
+}
+body[data-page^="projects/"] .case-metrics {
+  padding-block: 54px;
+  gap: 48px;
+}
+body[data-page^="projects/"] .case-metrics strong {
+  font-size: clamp(38px, 5vw, 76px);
+  letter-spacing: -.05em;
+}
+body[data-page^="projects/"] .case-metrics > div + div strong {
+  font-size: clamp(28px, 3.2vw, 46px);
+}
+body[data-page^="projects/"] .case-narrative { gap: 8vw; }
+body[data-page^="projects/"] .case-narrative-heading h2 {
+  font-size: clamp(36px, 4vw, 58px);
+  letter-spacing: -.045em;
+}
+body[data-page^="projects/"] .case-narrative-story article {
+  padding-block: 30px 40px;
+}
+body[data-page^="projects/"] .case-narrative-story h3 {
+  font-size: 29px;
+  letter-spacing: -.035em;
+}
+body[data-page^="projects/"] .case-narrative-story p {
+  color: var(--mute);
+  font-size: 17px;
+  line-height: 1.8;
+}
+body[data-page^="projects/"] :is(.case-chapters, .case-summary, .museum-reports) {
+  background: var(--soft);
+  border-radius: 0;
+}
+body[data-page^="projects/"] .case-photo-essay {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 38px;
+  align-items: start;
+}
+body[data-page^="projects/"] .case-photo-essay figure:nth-child(2) { padding-top: 70px; }
+body[data-page^="projects/"] .case-photo-essay img,
+body[data-page^="projects/"] .case-photo-essay figure:nth-child(2) img {
+  height: auto;
+  max-height: 700px;
+  object-fit: contain;
+  background: var(--soft);
+}
+body[data-page^="projects/"] .case-cta { background: var(--ink); }
+
+/* Competencies use the same generous photographic rhythm as the portfolio. */
+body[data-page="services.html"] .services-page { padding-top: 20px; }
+body[data-page="services.html"] .visual-services {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 55px 38px;
+}
+body[data-page="services.html"] .visual-service { display: block; }
+body[data-page="services.html"] .visual-service-photo {
+  border-radius: 0;
+  aspect-ratio: 1.45;
+  min-height: 0;
+  background: var(--soft);
+}
+body[data-page="services.html"] .visual-service-index {
+  top: 18px;
+  left: 18px;
+  padding: 9px 12px;
+  background: var(--paper);
+}
+body[data-page="services.html"] .visual-service-arrow {
+  bottom: 18px;
+  right: 18px;
+  width: 48px;
+  height: 48px;
+  background: var(--paper);
+}
+body[data-page="services.html"] .visual-service-copy { padding-top: 25px; padding-bottom: 29px; }
+body[data-page="services.html"] .visual-service-copy .eyebrow { font-size: 10px; }
+body[data-page="services.html"] .visual-service-copy h3 {
+  font-size: clamp(29px, 3vw, 44px);
+  line-height: 1.08;
+  max-width: 470px;
+  margin-top: 17px;
+  letter-spacing: -.045em;
+}
+body[data-page="services.html"] .visual-service-copy p {
+  font-size: 15px;
+  max-width: 420px;
+  line-height: 1.7;
+}
+body[data-page^="services/"] .service-cover {
+  height: auto;
+  min-height: 0;
+  border-radius: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+  background: var(--soft);
+  margin-top: 14px;
+}
+body[data-page^="services/"] .service-cover::after { content: none; }
+body[data-page^="services/"] .service-cover > img {
+  height: clamp(400px, 42vw, 650px);
+  width: 100%;
+  max-height: none;
+  object-fit: contain;
+  object-position: center;
+  background: var(--soft);
+}
+body[data-page^="services/"] .service-cover figcaption {
+  position: static;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  flex-direction: column;
+  gap: 26px;
+  padding: clamp(24px, 4vw, 60px);
+  color: var(--ink);
+}
+body[data-page^="services/"] .service-cover figcaption > span {
+  color: var(--mute);
+  font-size: 11px;
+}
+body[data-page^="services/"] .service-cover figcaption > a {
+  font-size: clamp(29px, 3.1vw, 47px);
+  line-height: 1.12;
+  letter-spacing: -.045em;
+  gap: 22px;
+  align-items: flex-end;
+}
+body[data-page^="services/"] .service-cover figcaption > a svg { flex-shrink: 0; }
+body[data-page^="services/"] .service-cover-credit14 { flex-basis: auto; }
+body[data-page^="services/"] .service-nav14 {
+  background: var(--paper);
+  border-color: var(--line);
+  padding-block: 23px;
+}
+body[data-page^="services/"] :is(.service-scopes14, .service-results14, .service-guide, .work-showcase14) {
+  background: var(--soft);
+  border-color: var(--line);
+}
+body[data-page^="services/"] .scope14-grid { gap: 38px; }
+body[data-page^="services/"] .scope14-card {
+  padding: 36px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+body[data-page^="services/"] .scope14-card:nth-child(2) {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+body[data-page^="services/"] .scope14-card h3 {
+  font-size: clamp(30px, 3.2vw, 46px);
+  line-height: 1.08;
+  letter-spacing: -.045em;
+}
+body[data-page^="services/"] .brief-panel14 {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--soft);
+}
+body[data-page^="services/"] .result14-grid { gap: 38px; }
+body[data-page^="services/"] .result14-grid > article { border-color: var(--line); }
+body[data-page^="services/"] .result14-grid p { color: var(--mute); }
+
+/* Situation selectors stay recognisable controls rather than dense boxed cards. */
+body[data-page="solutions.html"] .solution-section { padding-top: 18px; }
+body[data-page="solutions.html"] .solution-choices {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 32px;
+}
+body[data-page="solutions.html"] .solution-choices button {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  padding: 24px 18px 29px;
+  min-height: 220px;
+  transition: background .18s, color .18s;
+}
+body[data-page="solutions.html"] .solution-choices button:hover { background: var(--soft); }
+body[data-page="solutions.html"] .solution-choices button[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+body[data-page="solutions.html"] .solution-choices strong {
+  font-size: clamp(24px, 2.3vw, 34px);
+  line-height: 1.12;
+  letter-spacing: -.035em;
+  margin: 29px 0 17px;
+  max-width: 320px;
+}
+body[data-page="solutions.html"] .solution-choices button > span:not(.solution-number):not(.solution-arrow) {
+  max-width: 290px;
+  color: var(--mute);
+  font-size: 13px;
+  line-height: 1.65;
+}
+body[data-page="solutions.html"] .solution-choices button[aria-pressed="true"] > span { color: #e0ded8; }
+body[data-page="solutions.html"] #solution-result { margin-top: 55px; padding-top: 50px; }
+body[data-page="solutions.html"] .solution-result-grid h2 { letter-spacing: -.045em; }
+body[data-page="solutions.html"] .solution-directions a {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding-inline: 0;
+  margin-right: 12px;
+}
+
+@media (max-width: 1000px) {
+  body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-grid { gap: 48px 26px; }
+  body[data-page="services.html"] .visual-services { gap: 42px 26px; }
+  body[data-page="solutions.html"] .solution-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+  body[data-page^="projects/"] .museum-heading { grid-template-columns: 1fr; gap: 22px; }
+  body[data-page^="projects/"] .museum-heading > div { margin-top: 0; }
+  body[data-page^="projects/"] .museum-heading > div p { font-size: 16px; }
+  body[data-page^="projects/"] .case-narrative { gap: 5vw; }
+  body[data-page^="projects/"] .case-photo-essay { gap: 26px; }
+  body[data-page^="services/"] .service-cover > img { height: 430px; }
+  body[data-page^="services/"] .scope14-grid { gap: 24px; }
+  body[data-page^="services/"] .scope14-card { padding: 28px; }
+}
+
+@media (max-width: 800px) {
+  body[data-page="projects.html"] .catalog-tools { display: block; padding-top: 22px; }
+  body[data-page="projects.html"] .catalog-more { margin-top: 24px; }
+  body[data-page="projects.html"] .catalog-status { margin-top: 23px; }
+  body[data-page^="projects/"] .case-narrative { display: block; }
+  body[data-page^="projects/"] .case-narrative-story { margin-top: 38px; }
+  body[data-page^="projects/"] .visual-gallery .gallery-stage { height: min(73vw, 640px); }
+  body[data-page^="services/"] .service-cover { grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr); }
+  body[data-page^="services/"] .service-cover > img { height: 370px; }
+  body[data-page^="services/"] .service-cover figcaption { padding: 24px; gap: 20px; }
+  body[data-page^="services/"] .service-cover figcaption > a { font-size: 30px; }
+}
+
+@media (max-width: 600px) {
+  body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 45px;
+  }
+  body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-card { margin-bottom: 0; }
+  body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-image,
+  body[data-page="projects.html"] .editorial-grid .project-card[data-slot] .project-image { aspect-ratio: 1.3; }
+  body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-tag { top: 12px; left: 12px; padding: 8px 10px; font-size: 11px; }
+  body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-arrow { right: 12px; bottom: 12px; width: 44px; height: 44px; }
+  body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-meta { margin-top: 20px; font-size: 10px; }
+  body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-card h3 { font-size: 30px; line-height: 1.1; }
+  body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-work { font-size: 14px; line-height: 1.75; }
+  body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-directions a { min-height: 40px; }
+  body:is([data-page="projects.html"], [data-page^="projects/"], [data-page="services.html"], [data-page^="services/"], [data-page="solutions.html"]) .project-card-actions { align-items: center; flex-direction: row; }
+  body[data-page="projects.html"] .catalog-tools { margin-bottom: 35px; padding-bottom: 19px; }
+  body[data-page="projects.html"] .page-intro { padding-top: 28px; padding-bottom: 29px; }
+  body[data-page="projects.html"] .intro-grid h1 { font-size: clamp(36px, 9.8vw, 51px); }
+  body[data-page="projects.html"] .filter-list { margin-bottom: 20px; }
+  body[data-page="projects.html"] .filter-button { padding-inline: 13px; font-size: 12px; }
+  body[data-page="projects.html"] .catalog-more { margin-top: 18px; }
+  body[data-page^="projects/"] :is(.case-intro, .museum-opening) { padding-top: 28px; padding-bottom: 29px; }
+  body[data-page^="projects/"] :is(.case-intro, .museum-opening) .breadcrumbs { margin-bottom: 24px; font-size: 11px; }
+  body[data-page^="projects/"] :is(.case-intro h1, .museum-heading h1) { font-size: clamp(36px, 9.5vw, 54px); line-height: 1.055; letter-spacing: -.05em; }
+  body[data-page^="projects/"] .case-intro-bottom { margin-top: 25px; font-size: 12px; }
+  body[data-page^="projects/"] .case-scope-lead { margin-top: 19px; font-size: 14px; line-height: 1.7; }
+  body[data-page^="projects/"] .project-brief { gap: 20px; padding-block: 26px; }
+  body[data-page^="projects/"] .project-brief-result { padding-top: 19px; }
+  body[data-page^="projects/"] .museum-heading { margin-top: 25px; margin-bottom: 26px; }
+  body[data-page^="projects/"] .museum-heading > div p { font-size: 15px; }
+  body[data-page^="projects/"] .case-selection { gap: 9px 20px; padding-top: 9px; padding-bottom: 22px; }
+  body[data-page^="projects/"] .visual-gallery { margin-inline: var(--gutter); padding-top: 0; }
+  body[data-page^="projects/"] .visual-gallery .gallery-stage { height: min(100vw, 550px); min-height: 270px; padding-bottom: 60px; }
+  body[data-page^="projects/"] .visual-gallery .gallery-zoom { right: 10px; top: 10px; min-height: 44px; }
+  body[data-page^="projects/"] .gallery-ribbon { padding-block: 20px; }
+  body[data-page^="projects/"] .gallery-ribbon .gallery-thumbs { max-width: 100%; }
+  body[data-page^="projects/"] .gallery-ribbon .gallery-thumb { width: 76px; flex-basis: 76px; }
+  body[data-page^="projects/"] .case-metrics { grid-template-columns: 1fr; padding-block: 33px; gap: 26px; }
+  body[data-page^="projects/"] .case-metrics strong { font-size: 48px; }
+  body[data-page^="projects/"] .case-metrics > div + div strong { font-size: 29px; }
+  body[data-page^="projects/"] .case-metrics > div + div { padding: 26px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+  body[data-page^="projects/"] .case-narrative-heading h2 { font-size: 39px; }
+  body[data-page^="projects/"] .case-narrative-story article { padding-block: 25px 31px; }
+  body[data-page^="projects/"] .case-narrative-story h3 { font-size: 26px; }
+  body[data-page^="projects/"] .case-narrative-story p { font-size: 15px; line-height: 1.8; }
+  body[data-page^="projects/"] .case-photo-essay { grid-template-columns: 1fr; gap: 31px; }
+  body[data-page^="projects/"] .case-photo-essay figure:nth-child(2) { padding-top: 0; }
+  body[data-page="services.html"] .visual-services { grid-template-columns: 1fr; gap: 38px; }
+  body[data-page="services.html"] .visual-service { padding: 0; border-bottom: 0; }
+  body[data-page="services.html"] .visual-service-photo { aspect-ratio: 1.35; }
+  body[data-page="services.html"] .visual-service-copy { padding-top: 22px; padding-bottom: 26px; border-bottom: 1px solid var(--line); }
+  body[data-page="services.html"] .visual-service-copy h3 { font-size: 33px; margin-top: 13px; }
+  body[data-page="services.html"] .visual-service-copy p { font-size: 14px; }
+  body[data-page^="services/"] .service-cover { grid-template-columns: 1fr; margin-inline: var(--gutter); }
+  body[data-page^="services/"] .service-cover > img { height: auto; max-height: 65svh; }
+  body[data-page^="services/"] .service-cover figcaption { padding: 24px; gap: 16px; }
+  body[data-page^="services/"] .service-cover figcaption > a { font-size: 30px; }
+  body[data-page^="services/"] .service-nav14 { padding-block: 16px; }
+  body[data-page^="services/"] .scope14-grid { gap: 22px; }
+  body[data-page^="services/"] .scope14-card { padding: 26px; }
+  body[data-page^="services/"] .scope14-card h3 { font-size: 34px; }
+  body[data-page="solutions.html"] .solution-choices { grid-template-columns: 1fr; gap: 0; }
+  body[data-page="solutions.html"] .solution-choices button {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) 20px;
+    column-gap: 13px;
+    row-gap: 6px;
+    min-height: 108px;
+    padding: 16px 13px;
+  }
+  body[data-page="solutions.html"] .solution-choices strong { font-size: 19px; line-height: 1.2; margin: 0; }
+  body[data-page="solutions.html"] .solution-choices .solution-number { grid-column: 1; grid-row: 1 / 3; }
+  body[data-page="solutions.html"] .solution-choices strong { grid-column: 2; grid-row: 1; }
+  body[data-page="solutions.html"] .solution-choices button > span:not(.solution-number):not(.solution-arrow) { grid-column: 2; grid-row: 2; font-size: 12px; line-height: 1.4; }
+  body[data-page="solutions.html"] .solution-arrow { grid-column: 3; grid-row: 1 / 3; position: static; align-self: center; }
+  body[data-page="solutions.html"] #solution-result { margin-top: 35px; padding-top: 30px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-page="solutions.html"] .solution-choices button { transition: none; }
+}

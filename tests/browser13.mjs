@@ -43,7 +43,9 @@ export async function verifyRelease13({page,base,shots}){
   assert.ok(text.includes(normalize(project.case.result)),'CMS outcome in brief: '+id);
   if(id==='museum')assert.match(text,/июнь 2026/);
   const photo=page.locator(id==='museum'?'.museum-cover':'.project-gallery').first();
-  assert.ok(await brief.evaluate((node,selector)=>Boolean(node.compareDocumentPosition(document.querySelector(selector))&Node.DOCUMENT_POSITION_FOLLOWING),id==='museum'?'.museum-cover':'.project-gallery'),'facts before photos: '+id);
+  // Release 21 leads with photography; the intact CMS brief follows it in
+  // reading order, retaining the participation facts checked above.
+  assert.ok(await photo.evaluate(node=>Boolean(node.compareDocumentPosition(document.querySelector('.project-brief'))&Node.DOCUMENT_POSITION_FOLLOWING)),'participation facts after opening photo: '+id);
   assert.ok(await photo.count()>0);
  }
 

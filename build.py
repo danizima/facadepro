@@ -1,7 +1,7 @@
 """Generate the static site from portfolio data. Python 3, standard library only."""
 from pathlib import Path
 import json, re, html, urllib.parse, os
-import release4, visual5, release6, release7, release8, release9, assets9, visual10, release103, release11, release12, release13, seo13, forms14, services14, budget14, audiences15
+import release4, visual5, release6, release7, release8, release9, assets9, visual10, release103, release11, release12, release13, seo13, forms14, services14, budget14, audiences15, visual21
 from media_validation import validate_media
 ROOT=Path(__file__).resolve().parent
 VERSION=json.loads((ROOT/'package.json').read_text())['version']
@@ -51,7 +51,7 @@ def img(key,alt,base='',eager=False,sizes=None,full=False):
 def button(label,href,light=False):
  return f'<a class="button {"button-light" if light else ""}" href="{href}">{label}{ARROW}</a>'
 def header(base,active):
- return visual10.header(globals(),base,active)
+ return visual21.header(globals(),base,active)
 def footer(base=''):
  return f'''<footer class="site-footer"><div class="footer-top"><div><p class="eyebrow">Новый объект начинается с разговора</p><h2>Обсудим ваш<br>проект.</h2>{button('Подготовить заявку',base+'request.html',True)}</div><div class="footer-contact"><span class="contact-label">Ваш менеджер</span><p>{e(CFG["manager"])}</p><a class="phone" href="tel:{re.sub(r"[^+0-9]","",CFG["phone"])}">{e(CFG["phone"])}</a><a class="contact-email" href="mailto:{e(CFG["email"])}">{e(CFG["email"])} {ARROW}</a><a class="text-button" href="{base}index.html#callback">Попросить перезвонить ↗</a><a class="text-button" href="{base}contacts.html">Адреса и реквизиты {ARROW}</a></div></div><div class="footer-bottom"><a class="footer-brand" href="{base}index.html" aria-label="На главную"><img src="{base}assets/logo.svg" width="160" height="44" alt="ФАСАД.PRO"></a><span>© 2026 ФАСАД.PRO</span><span>Москва · Владивосток · Вся Россия</span><a href="{base}map.html">Карта проектов</a><a href="{base}portfolio.html">Собрать PDF</a><a href="{base}compare.html">Сравнить проекты</a><a href="{base}solutions.html">Подбор решения</a><a href="{base}privacy.html">Обработка данных</a><button class="text-button analytics-settings" type="button">Статистика</button><a href="#main">Наверх ↑</a></div><a class="site-version" href="{base}updates.html">Версия {VERSION} · Что нового</a></footer>'''
 def page(path,title,desc,body,active='',extra=''):
@@ -66,6 +66,7 @@ def page(path,title,desc,body,active='',extra=''):
  body=budget14.enhance(globals(),path,body)
  body=forms14.enhance(globals(),path,body)
  body=audiences15.enhance(globals(),path,body)
+ body=visual21.enhance(globals(),path,body)
  if path in ['index.html','about.html']: body+=release7.materials(globals())
  if path in ['index.html','contacts.html']:body+=release7.callback(globals())
  if path.startswith('projects/') and path.endswith('.html'):body+=release7.materials(globals(),path.split('/')[-1][:-5])
