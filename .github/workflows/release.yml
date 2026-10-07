@@ -34,7 +34,7 @@ jobs:
         run: docker build -t facadepro-ci:${{ github.sha }} .
       - name: Check production container startup
         run: |
-          docker run --detach --name facadepro-ci-smoke --publish 127.0.0.1:18080:8080 --env PUBLIC_URL=http://127.0.0.1:18080 --env SMTP_HOST= --env SMTP_FROM= --env TELEGRAM_BOT_TOKEN= --env TELEGRAM_CHAT_ID= facadepro-ci:${{ github.sha }}
+          docker run --detach --name facadepro-ci-smoke --publish 127.0.0.1:18080:8080 --env PUBLIC_URL=https://facadepro.test --env SMTP_HOST= --env SMTP_FROM= --env TELEGRAM_BOT_TOKEN= --env TELEGRAM_CHAT_ID= facadepro-ci:${{ github.sha }}
           trap 'docker logs facadepro-ci-smoke; docker rm --force --volumes facadepro-ci-smoke' EXIT
           for attempt in $(seq 1 60); do
             if curl --fail --silent --max-time 2 http://127.0.0.1:18080/healthz > "$RUNNER_TEMP/facadepro-container-health.json"; then
