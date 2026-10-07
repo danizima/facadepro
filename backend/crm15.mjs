@@ -74,7 +74,7 @@ export function createCRM15({db,fail=defaultFail,text,emailOK,SERVICE_IDS=[],STA
  function recordManagerAction({leadId,type,text:message,username,fromStatus='',toStatus=''}){
   // The owning quote/portal mutation already holds the transaction and bumps
   // the lead revision. This hook records facts in that same atomic write.
-  lead(leadId);const user=clean(username,60,true),kind=clean(type,40,true),description=clean(message,3000,true);
+  lead(leadId);const user=clean(username,60,true),kind=clean(type,40,true),description=clean(message,4000,true);
   if(!/^[a-z][a-z0-9_]{0,39}$/.test(kind))throw fail(422,'Проверьте тип действия менеджера.');
   if((fromStatus&&!Object.hasOwn(STATUSES,fromStatus))||(toStatus&&!Object.hasOwn(STATUSES,toStatus)))throw fail(422,'Проверьте статус действия.');
   if(fromStatus&&toStatus&&fromStatus!==toStatus)record(leadId,'status','Статус изменён.',user,{fromStatus,toStatus});

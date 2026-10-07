@@ -1,3 +1,4 @@
+import {showLeadPane} from './lead-pane16.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 
@@ -48,6 +49,7 @@ export async function verifyCRM15({page,base,shots}){
   await page.goto(base+'/admin/#leads/'+created.id,{waitUntil:'networkidle'});await page.reload({waitUntil:'networkidle'});await page.locator('#lead-edit').waitFor();
   const internal='Заметка CRM15 остаётся внутри компании';
   await page.locator('#lead-edit [name=note]').fill(internal);
+  await showLeadPane(page,'communication');
   await page.locator('#lead-history-form [name=type]').selectOption('call');
   await page.locator('#lead-history-form [name=text]').fill('Созвонились <script>alert(2)</script>, уточнили объём.');
   await page.locator('#lead-history-form button[type=submit]').click();
@@ -55,10 +57,12 @@ export async function verifyCRM15({page,base,shots}){
   assert.match(await page.locator('#lead-history-list').innerText(),/Созвонились <script>alert\(2\)<\/script>/);
   assert.equal(await page.locator('#lead-history-list script').count(),0);
   assert.equal(await page.locator('#lead-edit [name=note]').inputValue(),internal,'history preserves unsaved note');
+  await showLeadPane(page,'economics');
   await page.locator('#lead-commercial-form [name=amount]').fill('995000');
   await page.locator('#lead-commercial-form button[type=submit]').click();
   await page.locator('#lead-commercial-status').filter({hasText:'Результат сделки сохранён'}).waitFor();
   assert.equal(await page.locator('#lead-edit [name=note]').inputValue(),internal,'commercial preserves unsaved note');
+  await showLeadPane(page,'quote');
   await page.locator('#lead-quote-builder>summary').click();
   const form=page.locator('#lead-quote-build');
   await form.locator('[name=title]').fill('Предложение CRM15 <script>alert(3)</script>');
@@ -114,28 +118,35 @@ export async function verifyCRM15({page,base,shots}){
   await page.locator('.quote-history-item').first().locator('[data-quote-archive]').click();await page.locator('#lead-quote-status').filter({hasText:'Версия перемещена в архив'}).waitFor();
   client=await (await page.request.get(base+'/api/client/lead',{headers:{Authorization:'Bearer '+token}})).json();assert.ok(!client.quote,'archived publication is not exposed');assert.match(await page.locator('#lead-portal-quote-state').innerText(),/в архиве/);
   await page.locator('.quote-history-item').first().locator('[data-quote-archive]').click();await page.locator('#lead-quote-status').filter({hasText:'Версия возвращена'}).waitFor();
+  await showLeadPane(page,'request');
   const savePromise=page.waitForResponse(r=>new URL(r.url()).pathname.startsWith('/api/admin/leads/')&&r.request().method()==='PATCH');await page.locator('#lead-edit button[type=submit]').click();const save=await savePromise;assert.equal(new URL(save.url()).pathname,'/api/admin/leads/'+created.id);assert.equal(save.status(),200,await save.text());await page.locator('#lead-save-status').filter({hasText:'Сохранено'}).waitFor();
   const final=await (await page.request.get(base+'/api/admin/leads/'+created.id)).json();assert.equal(final.note,internal);assert.equal(final.commercial.amount,'995000.00');
+  await showLeadPane(page,'quote');
   assert.equal(await page.locator('#lead-quote-upload').isVisible(),true,'manual PDF upload remains usable');
   // A harmless client view can be reconciled; another employee's editable fields cannot.
   const session=await (await page.request.get(base+'/api/admin/session')).json(),foreignNote='Сотрудник изменил заметку в другой вкладке';
   const foreign=await page.request.patch(base+'/api/admin/leads/'+created.id,{headers:{Origin:base,'X-CSRF-Token':session.csrf},data:{status:'closed',note:foreignNote,assignee:'',next_contact:'',next_action:'',revision:final.revision}});
   assert.equal(foreign.status(),200,await foreign.text());
   const unsavedConflict='Моя несохранённая заметка после чужой правки';
+  await showLeadPane(page,'request');
   await page.locator('#lead-edit [name=note]').fill(unsavedConflict);
+  await showLeadPane(page,'communication');
   await page.locator('#lead-history-form [name=type]').selectOption('comment');
   await page.locator('#lead-history-form [name=text]').fill('Запись после изменения в другой вкладке');
   await page.locator('#lead-history-form button[type=submit]').click();
   await page.locator('#lead-save-status').filter({hasText:'Данные заявки изменились у другого сотрудника'}).waitFor();
   assert.equal(await page.locator('#lead-edit [name=note]').inputValue(),unsavedConflict,'conflict retains manager draft');
+  await showLeadPane(page,'request');
   const conflictPromise=page.waitForResponse(r=>new URL(r.url()).pathname.startsWith('/api/admin/leads/')&&r.request().method()==='PATCH');
   await page.locator('#lead-edit button[type=submit]').click();
   const conflict=await conflictPromise;assert.equal(conflict.status(),409,'changed staff fields remain protected');
   const protectedLead=await (await page.request.get(base+'/api/admin/leads/'+created.id)).json();
   assert.equal(protectedLead.note,foreignNote);assert.equal(protectedLead.assignee,'');assert.equal(protectedLead.status,'closed');
   assert.equal(await page.locator('#lead-edit [name=note]').inputValue(),unsavedConflict);
+  await showLeadPane(page,'communication');
   await page.locator('#lead-history-refresh').click();await page.locator('#lead-history-list').filter({hasText:'Созвонились'}).waitFor();
   await page.setViewportSize({width:320,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'quote workspace fits 320px');await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(shots,'crm-v15-detail-mobile.png'),fullPage:true});
   await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:path.join(shots,'crm-v15-detail-desktop.png'),fullPage:true});
+  await page.locator('[data-tab=leads]').click();await page.locator('#confirm-dialog').waitFor({state:'visible'});await page.locator('#confirm-yes').click();await page.locator('#new-manual-lead').waitFor();
   console.log('PASS v15 CRM: manual/duplicates, timeline/commercial, exact quote totals/idempotency/copy/PDF, publication/view/withdraw/archive, unsaved note preservation, 320/390/desktop');
 }

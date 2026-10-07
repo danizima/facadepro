@@ -6,14 +6,17 @@
   const sendStatus=q('#followup-send-status'),fieldset=form.querySelector('fieldset'),submit=q('#followup-submit');
   const picker=q('#followup-files'),drop=q('#followup-drop'),fileError=q('#followup-file-error');
   const quoteCard=q('#followup-quote'),quoteDownload=q('#followup-quote-download'),quoteFeedback=q('#followup-quote-feedback');
+  const responseCard=q('#followup-response'),responseForm=q('#followup-response-form'),responseFieldset=responseForm.querySelector('fieldset'),responseComment=q('#followup-response-comment'),responseStatus=q('#followup-response-status'),responseSubmit=q('#followup-response-submit');
+  const responseChoices=[...responseForm.querySelectorAll('[data-quote-choice]')],responseLabels={discuss:'Обсудить условия',reprice:'Нужен пересчёт',proceed:'Готов перейти к договору'};
   const requests=new Set(),blobURLs=new Set(),quoteViewed=new Set(),quoteViewing=new Set();
-  let files=[],busy=false,loaded=false,key=uuid(),generation=0,currentQuote=null,quoteBusy=false,activeUpload=null;
+  let files=[],busy=false,loaded=false,key=uuid(),generation=0,currentQuote=null,quoteBusy=false,activeUpload=null,responseChoice='',responseKey=uuid(),responseBusy=false,responseEpoch=0;
   const unauthorized=response=>[401,403,404,410].includes(response.status);
   function clearPrivate(){
     generation++;loaded=false;currentQuote=null;quoteBusy=false;busy=false;
     for(const controller of requests)controller.abort();requests.clear();activeUpload?.abort();activeUpload=null;
     for(const url of blobURLs)URL.revokeObjectURL(url);blobURLs.clear();quoteViewed.clear();quoteViewing.clear();
     content.hidden=true;quoteCard.hidden=true;quoteDownload.disabled=false;quoteDownload.textContent='Скачать КП · PDF ↓';
+    resetQuoteResponse();responseCard.hidden=true;
     for(const selector of ['#followup-reference','#followup-status','#followup-next','#followup-manager','#followup-expires','#followup-link-status','#followup-quote-version','#followup-quote-amount','#followup-quote-timeframe','#followup-quote-date','#followup-quote-name','#followup-quote-size','#followup-quote-feedback'])q(selector).textContent='';
     for(const selector of ['#followup-phone','#followup-email']){const link=q(selector);link.hidden=true;link.textContent='';link.removeAttribute('href');}
     q('#followup-updates').replaceChildren();form.reset();files=[];draw();fieldset.disabled=false;submit.textContent='Отправить дополнение ↗';
@@ -31,19 +34,34 @@
   function uuid(){if(crypto.randomUUID)return crypto.randomUUID();const values=crypto.getRandomValues(new Uint8Array(16));values[6]=(values[6]&15)|64;values[8]=(values[8]&63)|128;const hex=[...values].map(value=>value.toString(16).padStart(2,'0')).join('');return hex.slice(0,8)+'-'+hex.slice(8,12)+'-'+hex.slice(12,16)+'-'+hex.slice(16,20)+'-'+hex.slice(20);}
   function https(value){try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password&&value.length<=2000&&url.href.length<=2000?url.href:'';}catch{return '';}}
   function date(value){const parsed=new Date(value);return Number.isNaN(parsed.getTime())?'':parsed.toLocaleString('ru-RU',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+  function resetQuoteResponse(){
+    responseEpoch++;
+    responseBusy=false;responseChoice='';responseKey=uuid();responseForm.reset();responseFieldset.disabled=false;responseSubmit.disabled=true;responseSubmit.textContent='Отправить ответ ↗';responseStatus.textContent='';
+    responseChoices.forEach(button=>button.setAttribute('aria-pressed','false'));q('#followup-response-latest').hidden=true;
+    for(const selector of ['#followup-response-last-choice','#followup-response-last-date','#followup-response-last-comment'])q(selector).textContent='';q('#followup-response-last-date').removeAttribute('datetime');
+  }
   function renderQuote(value){
-    currentQuote=null;quoteCard.hidden=true;quoteFeedback.textContent='';
+    const prior=currentQuote;currentQuote=null;quoteCard.hidden=true;responseCard.hidden=true;quoteFeedback.textContent='';
     for(const selector of ['#followup-quote-version','#followup-quote-amount','#followup-quote-timeframe','#followup-quote-date','#followup-quote-name','#followup-quote-size'])q(selector).textContent='';
-    if(!value||typeof value.id!=='string'||!/^[A-Za-z0-9_-]{1,100}$/.test(value.id)||!Number.isInteger(value.version)||value.version<1||typeof value.name!=='string'||!value.name)return;
+    if(!value||typeof value.id!=='string'||!/^[A-Za-z0-9_-]{1,100}$/.test(value.id)||!Number.isInteger(value.version)||value.version<1||typeof value.name!=='string'||!value.name){resetQuoteResponse();return;}
     const route='/api/client/lead/quotes/'+encodeURIComponent(value.id);
-    if(value.downloadApi!==route+'/file'||value.viewApi!==route+'/view')return;
-    currentQuote={id:value.id,version:value.version,name:value.name,publishedAt:value.publishedAt,downloadApi:value.downloadApi,viewApi:value.viewApi};q('#followup-quote-version').textContent='Версия '+value.version;
+    if(value.downloadApi!==route+'/file'||value.viewApi!==route+'/view'){resetQuoteResponse();return;}
+    if(prior?.id!==value.id||prior?.publishedAt!==value.publishedAt)resetQuoteResponse();
+    currentQuote={id:value.id,version:value.version,name:value.name,publishedAt:value.publishedAt,downloadApi:value.downloadApi,viewApi:value.viewApi,responseApi:value.responseApi===route+'/response'?value.responseApi:null};q('#followup-quote-version').textContent='Версия '+value.version;
     const amount=typeof value.amount==='number'?value.amount:typeof value.amount==='string'&&/^\d{1,12}(?:\.\d{1,2})?$/.test(value.amount)?Number(value.amount):NaN;
     q('#followup-quote-amount').textContent=Number.isFinite(amount)&&amount>=0?amount.toLocaleString('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:2}):'Указана в КП';
     q('#followup-quote-timeframe').textContent=typeof value.timeframe==='string'&&value.timeframe?value.timeframe:'Указан в КП';
     q('#followup-quote-date').textContent=date(value.publishedAt)||'—';q('#followup-quote-name').textContent=value.name;
     q('#followup-quote-size').textContent='PDF'+(Number.isFinite(value.size)?' · '+(value.size<1024*1024?Math.max(1,Math.ceil(value.size/1024)).toLocaleString('ru-RU')+' КБ':(value.size/1024/1024).toLocaleString('ru-RU',{maximumFractionDigits:2})+' МБ'):'');
     quoteDownload.disabled=false;quoteCard.hidden=false;
+    if(currentQuote.responseApi){
+      responseCard.hidden=false;const saved=value.response;
+      const valid=saved&&saved.quoteId===value.id&&Object.hasOwn(responseLabels,saved.choice)&&typeof saved.comment==='string';
+      q('#followup-response-latest').hidden=!valid;
+      q('#followup-response-last-choice').textContent=valid?'Ваш последний ответ: '+responseLabels[saved.choice]:'';
+      q('#followup-response-last-date').textContent=valid?date(saved.createdAt):'';if(valid)q('#followup-response-last-date').dateTime=saved.createdAt;else q('#followup-response-last-date').removeAttribute('datetime');
+      q('#followup-response-last-comment').textContent=valid?saved.comment:'';
+    }else resetQuoteResponse();
   }
   function renderLead(lead){
     if(!lead||typeof lead.reference!=='string'||typeof lead.statusLabel!=='string')throw Error('Не удалось загрузить обращение.');
@@ -98,6 +116,27 @@
     finally{if(expected===generation){quoteBusy=false;quoteDownload.disabled=false;quoteDownload.textContent='Скачать КП · PDF ↓';}}
   });
   q('#followup-quote-question').addEventListener('click',()=>{if(!loaded||!currentQuote)return;const comment=form.elements.comment;if(!comment.value.trim()){comment.value='Вопрос по КП, версия '+currentQuote.version+': ';comment.dispatchEvent(new Event('input',{bubbles:true}));}comment.focus();comment.scrollIntoView({block:'center',behavior:'smooth'});});
+  function responseChanged(){if(responseBusy)return;responseKey=uuid();responseStatus.textContent='';responseSubmit.disabled=!responseChoice;}
+  for(const button of responseChoices)button.addEventListener('click',()=>{
+    if(!loaded||!currentQuote?.responseApi||responseBusy)return;responseChoice=button.dataset.quoteChoice;
+    responseChoices.forEach(choice=>choice.setAttribute('aria-pressed',String(choice===button)));responseChanged();
+  });
+  responseComment.addEventListener('input',responseChanged);
+  responseForm.addEventListener('submit',async event=>{
+    event.preventDefault();if(!loaded||!currentQuote?.responseApi||responseBusy||!Object.hasOwn(responseLabels,responseChoice))return;
+    if(!responseForm.reportValidity())return;const quote=currentQuote,expected=generation,expectedResponse=responseEpoch;
+    const payload={quoteId:quote.id,choice:responseChoice,comment:responseComment.value.trim(),idempotency:responseKey};
+    responseBusy=true;responseFieldset.disabled=true;responseSubmit.textContent='Отправляем…';responseStatus.textContent='Передаём ответ менеджеру…';
+    try{
+      const response=await privateFetch(quote.responseApi,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(expected!==generation||expectedResponse!==responseEpoch)return;
+      if(unauthorized(response)){unavailable();return;}const result=await response.json();if(expected!==generation||expectedResponse!==responseEpoch)return;
+      if(!response.ok)throw Object.assign(Error(result.error||'Не удалось передать ответ. Повторите попытку.'),{customerMessage:true});
+      if(result.received!==true||!result.lead)throw Object.assign(Error('Не удалось подтвердить получение. Повторите отправку — ответ не будет продублирован.'),{customerMessage:true});
+      if(currentQuote?.id!==quote.id||currentQuote?.publishedAt!==quote.publishedAt)return;
+      resetQuoteResponse();renderLead(result.lead);responseStatus.textContent='Ответ по КП, версия '+quote.version+', получен. Менеджер свяжется с вами.';
+    }catch(error){if(expected===generation&&expectedResponse===responseEpoch){responseStatus.textContent=error.customerMessage?error.message:'Не удалось подтвердить получение. Данные остались в форме. Повторите отправку — ответ не будет продублирован.';responseStatus.focus();}}
+    finally{if(expected===generation&&expectedResponse===responseEpoch){responseBusy=false;responseFieldset.disabled=false;responseSubmit.disabled=!responseChoice;responseSubmit.textContent='Отправить ответ ↗';}}
+  });
   function changed(){if(busy)return;key=uuid();sendStatus.textContent='';q('#followup-transfer').hidden=true;}
   function draw(){const list=q('#followup-selected-files');list.replaceChildren();files.forEach((file,index)=>{const li=document.createElement('li'),name=document.createElement('span'),remove=document.createElement('button');name.textContent=file.name+' · '+(file.size/1024/1024).toLocaleString('ru-RU',{maximumFractionDigits:2})+' МБ';remove.type='button';remove.textContent='Удалить ×';remove.setAttribute('aria-label','Удалить '+file.name);remove.disabled=busy;remove.onclick=()=>{if(busy)return;files.splice(index,1);changed();draw();};li.append(name,remove);list.append(li);});}
   function add(incoming){if(busy||!loaded)return;fileError.textContent='';const candidate=[...files];for(const file of incoming){if(candidate.some(item=>item.name===file.name&&item.size===file.size&&item.lastModified===file.lastModified))continue;if(!/\.(pdf|jpe?g|png|webp|dwg|dxf|xlsx|docx|txt|zip)$/i.test(file.name)){fileError.textContent='Неподдерживаемый формат: '+file.name;return;}if(!file.size||file.size>10*1024*1024){fileError.textContent='Файл должен быть непустым и не больше 10 МБ: '+file.name;return;}candidate.push(file);}if(candidate.length>5||candidate.reduce((sum,file)=>sum+file.size,0)>25*1024*1024){fileError.textContent='Допустимо до 5 файлов и до 25 МБ суммарно.';return;}files=candidate;changed();draw();}

@@ -12,7 +12,7 @@ const DEFAULT_MESSAGES={new:'Менеджер свяжется с вами дл�
 
 /**
  * Additive client continuation for existing leads. Server integration:
- * createClientPortal({db,DATA,hash,privateHash,text,fail,content,transaction,signature,onAddition?}).
+ * createClientPortal({db,DATA,hash,privateHash,text,fail,content,transaction,signature,onAddition?,onQuoteResponse?}).
  * onAddition({leadId,additionId}) is synchronous and queues notifications inside
  * the append transaction; a queue failure rolls back the whole addition.
  * Include issue(leadId) in BOTH first and repeated successful form responses.
@@ -27,9 +27,10 @@ const DEFAULT_MESSAGES={new:'Менеджер свяжется с вами дл�
  * chosen PDF. Client GET/HEAD downloads do not record a view automatically;
  * an explicit same-origin POST calls quoteViewed after the PDF-open action.
  */
-export function createClientPortal({db,DATA,hash,privateHash,text,fail,content,transaction,signature,onAddition,onManagerAction,now=Date.now,fileLimit=10*1024*1024,totalLimit=25*1024*1024,maxFiles=5}){
+export function createClientPortal({db,DATA,hash,privateHash,text,fail,content,transaction,signature,onAddition,onQuoteResponse,onManagerAction,now=Date.now,fileLimit=10*1024*1024,totalLimit=25*1024*1024,maxFiles=5}){
  if(typeof privateHash!=='function'||typeof signature!=='function')throw new TypeError('Portal requires keyed privateHash and the existing attachment signature validator.');
  if(onAddition!==undefined&&typeof onAddition!=='function')throw new TypeError('Portal onAddition must be a synchronous function.');
+ if(onQuoteResponse!==undefined&&typeof onQuoteResponse!=='function')throw new TypeError('Portal onQuoteResponse must be a synchronous function.');
  if(onManagerAction!==undefined&&typeof onManagerAction!=='function')throw new TypeError('Portal onManagerAction must be a synchronous function.');
  const managerAction=event=>{if(onManagerAction&&event.username){const result=onManagerAction(event);if(result&&typeof result.then==='function')throw new TypeError('Portal onManagerAction must record history synchronously.');}};
  db.exec(`
@@ -67,6 +68,15 @@ export function createClientPortal({db,DATA,hash,privateHash,text,fail,content,t
    publication_revision INTEGER NOT NULL,portal_generation TEXT NOT NULL,viewed_at TEXT NOT NULL,
    PRIMARY KEY(lead_id,publication_revision,portal_generation)
   );
+  CREATE TABLE IF NOT EXISTS lead_quote_responses16(
+   id TEXT PRIMARY KEY,lead_id TEXT NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+   quote_id TEXT NOT NULL REFERENCES quote_versions(id) ON DELETE CASCADE,
+   publication_revision INTEGER NOT NULL,portal_generation TEXT NOT NULL,
+   choice TEXT NOT NULL CHECK(choice IN ('discuss','reprice','proceed')),
+   comment TEXT NOT NULL,created_at TEXT NOT NULL,idempotency TEXT NOT NULL,digest TEXT NOT NULL,
+   UNIQUE(lead_id,portal_generation,idempotency)
+  );
+  CREATE INDEX IF NOT EXISTS lead_quote_responses16_lead ON lead_quote_responses16(lead_id,quote_id,created_at);
  `);
  const runTransaction=transaction||((fn)=>{db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(error){db.exec('ROLLBACK');throw error;}});
  const unavailable=()=>fail(404,'Ссылка недоступна или срок её действия завершён. Свяжитесь с менеджером.');
@@ -156,7 +166,34 @@ export function createClientPortal({db,DATA,hash,privateHash,text,fail,content,t
  }
  function clientQuote(leadId){
   const row=publicationRow(leadId);if(!row||row.archived)return null;
-  return {id:row.quote_id,version:row.version,name:row.name,size:row.size,amount:Math.floor(row.amount_kopecks/100)+'.'+String(row.amount_kopecks%100).padStart(2,'0'),timeframe:row.timeframe,publishedAt:row.published_at,downloadApi:'/api/client/lead/quotes/'+row.quote_id+'/file',viewApi:'/api/client/lead/quotes/'+row.quote_id+'/view'};
+  const response=db.prepare('SELECT id,quote_id,choice,comment,created_at FROM lead_quote_responses16 WHERE lead_id=? AND quote_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1').get(leadId,row.quote_id);
+  return {id:row.quote_id,version:row.version,name:row.name,size:row.size,amount:Math.floor(row.amount_kopecks/100)+'.'+String(row.amount_kopecks%100).padStart(2,'0'),timeframe:row.timeframe,publishedAt:row.published_at,downloadApi:'/api/client/lead/quotes/'+row.quote_id+'/file',viewApi:'/api/client/lead/quotes/'+row.quote_id+'/view',responseApi:'/api/client/lead/quotes/'+row.quote_id+'/response',response:response?safeQuoteResponse(response):null};
+ }
+ function safeQuoteResponse(row){return {id:row.id,quoteId:row.quote_id,choice:row.choice,comment:row.comment,createdAt:row.created_at};}
+ function quoteResponse(token,input){
+  // Retry lookup follows authorization, so a revoked or rotated capability
+  // cannot retrieve a prior receipt. An already committed response may replay
+  // after the manager changes the selection, without creating another event.
+  const portal=authorize(token);
+  if(!input||typeof input!=='object'||Array.isArray(input))throw fail(422,'Выберите ответ на КП.');
+  const quoteId=text(input.quoteId||'',80,true),key=text(input.idempotency||'',80,true);
+  if(!QUOTE_ID.test(quoteId)||!QUOTE_ID.test(key))throw fail(422,'Обновите страницу и повторите ответ.');
+  if(!['discuss','reprice','proceed'].includes(input.choice))throw fail(422,'Выберите ответ на КП.');
+  const choice=input.choice,comment=text(input.comment??'',1500),digest=hash(JSON.stringify({quoteId,choice,comment}));
+  return runTransaction(()=>{
+   const currentPortal=authorize(token);
+   const prior=db.prepare('SELECT * FROM lead_quote_responses16 WHERE lead_id=? AND portal_generation=? AND idempotency=?').get(currentPortal.lead_id,currentPortal.generation,key);
+   if(prior){
+    if(prior.digest!==digest)throw fail(409,'Ответ изменился. Отправьте его с новым номером.');
+    return {received:true,replayed:true,response:safeQuoteResponse(prior),lead:read(token)};
+   }
+   const {quote}=authorizedQuote(token,quoteId);
+   const id=randomUUID(),createdAt=new Date(now()).toISOString();
+   db.prepare('INSERT INTO lead_quote_responses16(id,lead_id,quote_id,publication_revision,portal_generation,choice,comment,created_at,idempotency,digest) VALUES(?,?,?,?,?,?,?,?,?,?)').run(id,portal.lead_id,quoteId,quote.revision,portal.generation,choice,comment,createdAt,key,digest);
+   db.prepare('UPDATE leads SET revision=revision+1 WHERE id=?').run(portal.lead_id);
+   if(onQuoteResponse){const result=onQuoteResponse({leadId:portal.lead_id,responseId:id,quoteId});if(result&&typeof result.then==='function')throw new TypeError('Portal onQuoteResponse must queue notifications synchronously.');}
+   return {received:true,replayed:false,response:{id,quoteId,choice,comment,createdAt},lead:read(token)};
+  });
  }
  function changePublication(leadId,input,username=''){
   return runTransaction(()=>{
@@ -267,5 +304,5 @@ export function createClientPortal({db,DATA,hash,privateHash,text,fail,content,t
    return receipt(result.saved,result.replayed);
   }catch(error){if(!committed)for(const id of written)await rm(path.join(DATA,'uploads',id),{force:true});throw error;}
  }
- return {issue,read,append,admin,adminAction,authorize,tokenFromHeader,quoteDownload,quoteViewed};
+ return {issue,read,append,admin,adminAction,authorize,tokenFromHeader,quoteDownload,quoteViewed,quoteResponse};
 }

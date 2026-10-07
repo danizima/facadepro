@@ -20,6 +20,8 @@ import {createClientPortal} from './backend/client-portal.mjs';
 import {createQuotes} from './backend/quotes14.mjs';
 import {createBudget} from './backend/budget14.mjs';
 import {createCRM15,validateAttribution} from './backend/crm15.mjs';
+import {createOperations16} from './backend/operations16.mjs';
+import {createQuoteTools16} from './backend/quote-tools16.mjs';
 const solutionCatalog=JSON.parse(await readFile(path.join(ROOT,'source/solutions.json'),'utf8'));
 const site=path.join(ROOT,'site');
 const VERSION=JSON.parse(await readFile(path.join(ROOT,'package.json'),'utf8')).version;
@@ -30,7 +32,15 @@ const portal=createClientPortal({db,DATA,hash,privateHash,text,fail,content,tran
  const cfg=notificationConfig();
  db.prepare("INSERT INTO outbox(id,lead_id,recipient,kind,dedupe) VALUES(?,?,?,'addition',?)").run(randomUUID(),leadId,cfg.leadTo,'email-addition:'+additionId);
  if(cfg.telegramEnabled)db.prepare("INSERT INTO outbox(id,lead_id,recipient,kind,channel,dedupe) VALUES(?,?,?,'addition','telegram',?)").run(randomUUID(),leadId,cfg.telegramChat,'telegram-addition:'+additionId);
+ operations.recordIncoming({leadId,kind:'addition',eventId:additionId});
+},onQuoteResponse:({leadId,responseId,quoteId})=>{
+ const cfg=notificationConfig();
+ operations.recordIncoming({leadId,kind:'quote_response',eventId:responseId,quoteId});
+ db.prepare("INSERT INTO outbox(id,lead_id,recipient,kind,dedupe) VALUES(?,?,?,'quote_response',?)").run(randomUUID(),leadId,cfg.leadTo,'email-quote-response:'+responseId);
+ if(cfg.telegramEnabled)db.prepare("INSERT INTO outbox(id,lead_id,recipient,kind,channel,dedupe) VALUES(?,?,?,'quote_response','telegram',?)").run(randomUUID(),leadId,cfg.telegramChat,'telegram-quote-response:'+responseId);
 }});
+const operations=createOperations16({db,fail,text,transaction,hash,staff,crm,timezone:()=>notificationConfig().timezone});
+const quoteTools=createQuoteTools16({db,fail,text,transaction,audit,crm,SERVICE_IDS});
 const budget=createBudget({db,fail,text,audit});
 initializeRetention(db);
 const maintenance=createMaintenance({db,dataDir:DATA,version:VERSION});
@@ -108,6 +118,11 @@ async function materialFile(req,res,key){
 function cleanPage(s){const p=String(s).split('?')[0].split('#')[0];return /^\/(?:[a-z0-9-]+\/)?[a-z0-9-]*\.?[a-z]*$/.test(p)&&p.length<=150&&!p.startsWith('/admin')?p:'/';}
 function projectLink(value){if(!value)return '';let u;try{u=new URL(value);}catch{throw fail(422,'Проверьте ссылку на проект.');}if(u.protocol!=='https:'||u.username||u.password||!u.hostname||/[\s\u0000-\u001f]/.test(value))throw fail(422,'Укажите HTTPS-ссылку на проект без логина и пароля.');return value;}
 function mailMessage(row){const lead=db.prepare('SELECT * FROM leads WHERE id=?').get(row.lead_id),p=JSON.parse(lead.payload),settings=content().settings,base=PUBLIC_URL||'';
+ if(row.kind==='quote_response'){
+  const responseId=String(row.dedupe||'').split(':').at(-1),response=db.prepare('SELECT r.choice,r.comment,r.created_at,q.version FROM lead_quote_responses16 r JOIN quote_versions q ON q.id=r.quote_id WHERE r.id=? AND r.lead_id=?').get(responseId,lead.id);
+  const choices={discuss:'Обсудить условия',reprice:'Нужен пересчёт',proceed:'Готов перейти к договору'};
+  return {to:row.recipient,subject:'ФАСАД.PRO: ответ на КП '+lead.reference,body:[`Ответ по КП${response?' №'+response.version:''} для обращения ${lead.reference}`,response?choices[response.choice]:'Откройте ответ в панели.',response?.comment||'',`Открыть обращение: ${base}/admin/#leads/${lead.id}`].filter(Boolean).join('\n\n'),message_id:'<'+row.id+'@facadepro.ru>'};
+ }
  if(row.kind==='addition'){const rows=db.prepare('SELECT created_at,comment,project_link FROM lead_additions WHERE lead_id=? ORDER BY created_at DESC,id DESC LIMIT 5').all(lead.id);return {to:row.recipient,subject:'ФАСАД.PRO: новые материалы '+lead.reference,body:[`Дополнение к заявке ${lead.reference}`,`Клиент: ${p.name}`,rows.map(r=>[r.created_at,r.comment,r.project_link].filter(Boolean).join('\n')).join('\n\n'),`Открыть материалы в панели: ${base}/admin/#leads/${lead.id}`].join('\n\n'),message_id:'<'+row.id+'@facadepro.ru>'};}
  if(row.kind.startsWith('reminder_'))return {to:row.recipient,subject:'ФАСАД.PRO: напоминание '+lead.reference,body:telegramMessage(row,lead)+'\n\nСледующее действие: '+(lead.next_action||'Взять заявку в работу'),message_id:'<'+row.id+'@facadepro.ru>'};
  if(row.kind==='receipt')return {to:row.recipient,subject:'ФАСАД.PRO: заявка '+lead.reference+' принята',body:`Здравствуйте, ${p.name}!\n\nМы получили вашу заявку ${lead.reference}. Менеджер свяжется с вами для уточнения деталей.\n\n${settings.manager}\n${settings.phone}\n${settings.email}\n\nЭто подтверждение получения заявки, а не согласование цены или срока.`,message_id:`<${row.id}@facadepro.ru>`};
@@ -158,11 +173,16 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
   }
   throw fail(405,'Метод не поддерживается.');
  }
- const clientQuoteMatch=route.match(/^\/api\/client\/lead\/quotes\/([a-f0-9-]{36})\/(file|view)$/);
+ const clientQuoteMatch=route.match(/^\/api\/client\/lead\/quotes\/([a-f0-9-]{36})\/(file|view|response)$/);
  if(clientQuoteMatch){
   res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Robots-Tag','noindex, nofollow');
   if(!rate('client-quotes:'+ip(req),120,600000))throw fail(429,'Подождите перед следующим запросом.');
   const token=portal.tokenFromHeader(req.headers.authorization),[,quoteId,action]=clientQuoteMatch;
+  if(action==='response'&&req.method==='POST'){
+   if(!rate('client-responses:'+ip(req),30,3600000))throw fail(429,'Подождите перед отправкой нового ответа.');
+   const input=await jsonBody(req,8000);if(input.quoteId!==undefined&&input.quoteId!==quoteId)throw fail(422,'Проверьте выбранное КП.');
+   const result=portal.quoteResponse(token,{...input,quoteId});json(res,200,result);if(!result.replayed)void flushMail();return;
+  }
   if(action==='view'&&req.method==='POST'){json(res,200,portal.quoteViewed(token,quoteId));return;}
   if(action==='file'&&['GET','HEAD'].includes(req.method)){
    const file=await portal.quoteDownload(token,quoteId,{recordView:false});
@@ -242,6 +262,21 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
  }
  if(route.startsWith('/api/admin/')){
   const s=session(req,!['GET','HEAD'].includes(req.method));
+  if(route==='/api/admin/day'&&req.method==='GET'){json(res,200,operations.day(s.username));return;}
+  if(route==='/api/admin/incoming'&&req.method==='GET'){json(res,200,operations.inbox({username:s.username,mine:url.searchParams.get('mine')==='1',limit:Number(url.searchParams.get('limit')||100),offset:Number(url.searchParams.get('offset')||0),leadId:url.searchParams.get('leadId')||undefined}));return;}
+  const incomingMatch=route.match(/^\/api\/admin\/incoming\/([a-f0-9-]{36})$/);
+  if(incomingMatch){if(req.method!=='PUT')throw fail(405,'Метод не поддерживается.');json(res,200,operations.markIncoming(incomingMatch[1],await jsonBody(req,1000),s.username));return;}
+  const callMatch=route.match(/^\/api\/admin\/leads\/([a-f0-9-]{36})\/call-result$/);
+  if(callMatch){if(req.method!=='POST')throw fail(405,'Метод не поддерживается.');if(!rate('call-result:'+s.username,120,600000))throw fail(429,'Подождите перед добавлением новых записей.');json(res,200,operations.call(callMatch[1],await jsonBody(req,12000),s.username));return;}
+  if(route==='/api/admin/quote-templates'){
+   if(req.method==='GET'){json(res,200,quoteTools.templates());return;}
+   if(req.method==='POST'){const result=quoteTools.templateCreate(await jsonBody(req,65536),s.username);json(res,result.duplicate?200:201,result);return;}
+   throw fail(405,'Метод не поддерживается.');
+  }
+  const templateMatch=route.match(/^\/api\/admin\/quote-templates\/([a-f0-9-]{36})$/);
+  if(templateMatch){if(!['PUT','PATCH','DELETE'].includes(req.method))throw fail(405,'Метод не поддерживается.');const input=await jsonBody(req,65536);if(req.method!=='DELETE'){json(res,200,quoteTools.templateUpdate(templateMatch[1],input,s.username));return;}json(res,200,quoteTools.templateDelete(templateMatch[1],input,s.username));return;}
+  const costingMatch=route.match(/^\/api\/admin\/leads\/([a-f0-9-]{36})\/costing$/);
+  if(costingMatch){if(req.method==='GET'){json(res,200,quoteTools.costing(costingMatch[1]));return;}if(req.method==='PUT'){json(res,200,quoteTools.saveCosting(costingMatch[1],await jsonBody(req,65536),s.username));return;}throw fail(405,'Метод не поддерживается.');}
   if(route==='/api/admin/sales'&&req.method==='GET'){const days=[7,30,90].includes(Number(url.searchParams.get('days')))?Number(url.searchParams.get('days')):30;json(res,200,crm.sales({days}));return;}
   if(route==='/api/admin/leads'&&req.method==='POST'){
    if(!rate('manual-leads:'+s.username,60,600000))throw fail(429,'Подождите перед добавлением новых обращений.');
@@ -356,11 +391,11 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
   if(route==='/api/admin/media'&&req.method==='POST'){const form=await multipart(req,FILE_LIMIT+65536),files=await getFiles(form,true);if(files.length!==1)throw fail(422,'Выберите фотографию.');const f=files[0],ext=f.ext==='jpeg'?'jpg':f.ext,key='media/'+f.id+'.'+ext;await writeFile(path.join(DATA,key),f.bytes,{mode:0o600,flag:'wx'});audit(s.username,'photo_uploaded',key);json(res,201,{key,url:'/'+key});return;}
   if(route==='/api/admin/stats'&&req.method==='GET'){const days=[7,30,90].includes(Number(url.searchParams.get('days')))?Number(url.searchParams.get('days')):30;json(res,200,stats(days));return;}
   if(route==='/api/admin/staff'&&req.method==='GET'){json(res,200,{staff:staff()});return;}
-  if(route==='/api/admin/reminders'&&req.method==='GET'){json(res,200,reminders(todayParam(url.searchParams.get('today')),url.searchParams.get('mine')==='1'?s.username:''));return;}
-  if(route==='/api/admin/leads'&&req.method==='GET'){json(res,200,listLeads(url.searchParams,s.username));return;}
+  if(route==='/api/admin/reminders'&&req.method==='GET'){json(res,200,reminders(todayParam(url.searchParams.get('today')||localClock(new Date(),notificationConfig()).day),url.searchParams.get('mine')==='1'?s.username:''));return;}
+  if(route==='/api/admin/leads'&&req.method==='GET'){if(!url.searchParams.get('today'))url.searchParams.set('today',localClock(new Date(),notificationConfig()).day);const counts=operations.unreadCounts(s.username),list=listLeads(url.searchParams,s.username);json(res,200,{...list,rows:list.rows.map(row=>({...row,unreadCount:counts[row.id]||0}))});return;}
   const match=route.match(/^\/api\/admin\/leads\/([a-f0-9-]{36})(\/retry)?$/);
   if(match){const lead=db.prepare('SELECT * FROM leads WHERE id=?').get(match[1]);if(!lead)throw fail(404,'Заявка не найдена.');
-   if(req.method==='GET'){json(res,200,{...lead,payload:JSON.parse(lead.payload),commercial:crm.commercial(lead.id),files:db.prepare('SELECT id,name,size FROM files WHERE lead_id=?').all(lead.id),notifications:db.prepare('SELECT id,kind,channel,state,attempts,last_error,sent_at FROM outbox WHERE lead_id=?').all(lead.id)});return;}
+   if(req.method==='GET'){json(res,200,{...lead,payload:JSON.parse(lead.payload),unreadCount:operations.unreadCounts(s.username)[lead.id]||0,commercial:crm.commercial(lead.id),files:db.prepare('SELECT id,name,size FROM files WHERE lead_id=?').all(lead.id),notifications:db.prepare('SELECT id,kind,channel,state,attempts,last_error,sent_at FROM outbox WHERE lead_id=?').all(lead.id)});return;}
    if(req.method==='PATCH'){const b=await jsonBody(req,15000);if(!STATUSES[b.status])throw fail(422,'Выберите статус.');const note=text(b.note||'',10000);if(b.revision!==lead.revision)throw fail(409,'Заявка изменена в другой вкладке. Откройте её заново.');const f=updateFollowup(lead,b);transaction(()=>{db.prepare('UPDATE leads SET status=?,note=?,assignee=?,next_contact=?,next_action=?,revision=revision+1 WHERE id=?').run(b.status,note,f.assignee,f.nextContact,f.nextAction,lead.id);crm.recordStatus(lead,{...b,note,assignee:f.assignee,next_contact:f.nextContact,next_action:f.nextAction},s.username);audit(s.username,'lead_updated',lead.id);});json(res,200,{ok:true,revision:lead.revision+1});return;}
    if(req.method==='POST'&&match[2]){db.prepare("UPDATE outbox SET state='pending',attempts=0,next_try=0,last_error='' WHERE lead_id=? AND state IN ('failed','pending')").run(lead.id);audit(s.username,'notification_retry',lead.id);void flushMail();json(res,200,{ok:true});return;}
    if(req.method==='DELETE'){const quoteFiles=db.prepare('SELECT file_key FROM quote_versions WHERE lead_id=?').all(lead.id);const files=db.prepare('SELECT id FROM files WHERE lead_id=?').all(lead.id);transaction(()=>{db.prepare('DELETE FROM leads WHERE id=?').run(lead.id);audit(s.username,'lead_deleted',lead.id);});for(const f of files)await rm(path.join(DATA,'uploads',f.id),{force:true});for(const f of quoteFiles)if(/^quotes\/[a-f0-9-]{36}\.pdf$/.test(f.file_key))await rm(path.join(DATA,f.file_key),{force:true});json(res,200,{ok:true});return;}

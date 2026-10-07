@@ -47,7 +47,7 @@ try{
  assert.equal(quotes.list(firstLead).quotes[0].state,'draft','publication does not claim email or messenger delivery');
  assert.equal(quotes.list(firstLead).quotes[0].sentAt,'');assert.equal(db.prepare('SELECT COUNT(*) n FROM outbox').get().n,0);
  const safeQuote=portal.read(token).quote;
- assert.deepEqual(Object.keys(safeQuote).sort(),['id','version','name','size','amount','timeframe','publishedAt','downloadApi','viewApi'].sort());
+ assert.deepEqual(Object.keys(safeQuote).sort(),['id','version','name','size','amount','timeframe','publishedAt','downloadApi','viewApi','responseApi','response'].sort());
  assert.equal(safeQuote.id,first.id);assert.equal(safeQuote.amount,'1234567.89');assert.equal(safeQuote.timeframe,'60 рабочих дней');
  assert.equal(safeQuote.downloadApi,'/api/client/lead/quotes/'+first.id+'/file');
  assert.equal(safeQuote.viewApi,'/api/client/lead/quotes/'+first.id+'/view');

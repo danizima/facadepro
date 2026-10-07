@@ -13,8 +13,10 @@ export function listLeads(params,username){
  const due=params.get('due')||'';if(status&&!STATUSES[status]||!['','overdue','today','upcoming','unscheduled'].includes(due))throw fail(422,'Неизвестный фильтр.');
  let where="WHERE (?='' OR status=?) AND (?='' OR reference LIKE ? OR payload LIKE ?)";const args=[status,status,q,'%'+q+'%','%'+q+'%'];
  if(assignee){where+=' AND assignee=?';args.push(assignee);}
+ const incoming=params.get('incoming')||'';if(!['','0','1'].includes(incoming))throw fail(422,'Проверьте фильтр входящих.');
+ if(incoming==='1'){where+=' AND EXISTS(SELECT 1 FROM lead_incoming16 i WHERE i.lead_id=leads.id AND NOT EXISTS(SELECT 1 FROM lead_incoming_ack16 a WHERE a.incoming_id=i.id AND a.username=? AND a.processed=1))';args.push(username);}
  if(due){where+=" AND status NOT IN ('won','closed')";if(due==='unscheduled')where+=" AND next_contact=''";else{where+=" AND next_contact<>'' AND next_contact"+({overdue:'<',today:'=',upcoming:'>'})[due]+'?';args.push(today);}}
- const order=due&&due!=='unscheduled'?'next_contact ASC,created DESC':'created DESC';
+ const order=due&&due!=='unscheduled'?'next_contact ASC,created DESC,rowid DESC':'created DESC,rowid DESC';
  const rows=db.prepare('SELECT id,reference,created,kind,status,payload,revision,assignee,next_contact,next_action FROM leads '+where+' ORDER BY '+order+' LIMIT 50 OFFSET ?').all(...args,offset).map(r=>({...r,payload:JSON.parse(r.payload)}));
  return {rows,total:db.prepare('SELECT COUNT(*) n FROM leads '+where).get(...args).n,offset,statuses:STATUSES,staff:staff(),reminders:reminders(today,assignee),today};
 }

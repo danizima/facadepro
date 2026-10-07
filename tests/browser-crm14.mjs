@@ -1,3 +1,4 @@
+import {showLeadPane} from './lead-pane16.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import path from 'node:path';
@@ -44,10 +45,12 @@ export async function verifyCRM14({page,base,shots}){
   assert.equal(await page.locator('.lead-request-details a[href="https://example.com/crm14-project"]').getAttribute('rel'),'noopener noreferrer');
   await page.locator('#lead-edit [name=next_action]').fill('Уточнить размеры');
   await page.locator('[data-contact-days="1"]').click();
+  await showLeadPane(page,'request');
   await page.locator('#lead-edit button[type=submit]').click();
   await page.locator('#lead-save-status').filter({hasText:'Сохранено'}).waitFor();
   await page.locator('#lead-edit [name=note]').fill('Несохранённая внутренняя заметка CRM v14');
   const upload=async(name,amount)=>{
+    await showLeadPane(page,'quote');
     await page.locator('#lead-quote-upload [name=files]').setInputFiles({name,mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF')});
     await page.locator('#lead-quote-upload [name=amount]').fill(amount);
     await page.locator('#lead-quote-upload [name=timeframe]').fill('20 рабочих дней');
@@ -77,6 +80,7 @@ export async function verifyCRM14({page,base,shots}){
   await page.locator('#lead-quote-status').filter({hasText:'Версия возвращена из архива'}).waitFor();
   assert.equal(await page.locator('.quote-history-item').first().locator('[data-quote-send]').count(),1);
   assert.equal(await page.locator('#lead-edit [name=note]').inputValue(),'Несохранённая внутренняя заметка CRM v14','archive preserves unsaved note');
+  await showLeadPane(page,'request');
   await page.locator('#lead-edit button[type=submit]').click();
   await page.locator('#lead-save-status').filter({hasText:'Сохранено'}).waitFor();
   const afterQuote=await (await page.request.get(base+'/api/admin/leads/'+lead.id)).json();
@@ -84,18 +88,22 @@ export async function verifyCRM14({page,base,shots}){
   assert.equal(afterQuote.assignee,lead.assignee,'existing assignee remains intact');
   assert.equal(afterQuote.next_action,'Уточнить размеры');
   assert.ok(afterQuote.next_contact);
+  await showLeadPane(page,'materials');
   await page.locator('.portal-update').waitFor();
   assert.match(await page.locator('.portal-update').innerText(),/Материалы заказчика <script>alert\(2\)<\/script>/);
   assert.equal(await page.locator('.portal-update script').count(),0);
   assert.equal(await page.locator('.portal-update a[href="https://example.com/crm14-addition"]').count(),1);
   assert.equal(await page.locator('.portal-update a[download]').count(),1);
+  await showLeadPane(page,'quote');
   await page.locator('#lead-portal-message [name=customerMessage]').fill('Получили дополнения. Готовим расчёт.');
   await page.locator('#lead-portal-message button[type=submit]').click();
   await page.locator('#lead-portal-status').filter({hasText:'Сообщение для заказчика сохранено'}).waitFor();
   let customer=await (await page.request.get(base+'/api/client/lead',{headers:{Authorization:'Bearer '+token}})).json();
   assert.equal(customer.customerMessage,'Получили дополнения. Готовим расчёт.');
   assert.ok(!JSON.stringify(customer).includes('Несохранённая внутренняя заметка'),'internal note is private');
+  await showLeadPane(page,'request');
   await page.locator('#lead-edit [name=note]').fill('Заметка сохранена после выдачи ссылки');
+  await showLeadPane(page,'quote');
   await page.locator('#lead-portal-issue').click();
   await page.locator('#confirm-dialog').waitFor({state:'visible'});
   await page.locator('#confirm-yes').click();
@@ -112,6 +120,7 @@ export async function verifyCRM14({page,base,shots}){
   await page.locator('#lead-portal-status').filter({hasText:'Доступ по ссылке отключён'}).waitFor();
   assert.equal(await page.locator('#lead-portal-link-result').isHidden(),true);
   assert.equal((await page.request.get(base+'/api/client/lead',{headers:{Authorization:'Bearer '+newToken}})).status(),404,'revoke disables private link');
+  await showLeadPane(page,'request');
   await page.locator('#lead-edit button[type=submit]').click();
   await page.locator('#lead-save-status').filter({hasText:'Сохранено'}).waitFor();
   const final=await (await page.request.get(base+'/api/admin/leads/'+lead.id)).json();
