@@ -2,7 +2,7 @@
 import hashlib
 from pathlib import Path
 
-CSS=['styles.css','enhancements.css','business.css','release4.css','visual5.css','museum.css','release6.css','release7.css','release8.css','release9.css','visual10.css','release103.css','release11.css','release12.css','release13.css']
+CSS=['styles.css','enhancements.css','business.css','release4.css','visual5.css','museum.css','release6.css','release7.css','release8.css','release9.css','visual10.css','release103.css','release11.css','release12.css','release13.css','services14.css','followup14.css','budget14.css']
 
 
 def write_bundle(g,names,extension):
@@ -22,6 +22,7 @@ def assets(g,route,body,base):
     scripts.append('visual10.js')
     if any(x in body for x in ['service-guide','data-project-pdf','survey-film']):scripts.append('release12.js')
     if route=='photo-request.html':scripts.append('photo-request.js')
+    if route in ('index.html','budget.html','quote.html'):scripts.append('budget14.js')
     if 'report-viewer' in body or 'id="reports"' in body or 'museum-reports' in body:scripts.append('museum.js')
     if any(marker in body for marker in ('data-audience=', 'data-detail-pin=', 'data-report-year=', 'data-selection-pdf')) or route in ('request.html','quote.html'):scripts.append('release6.js')
     if 'callback-form' in body or route=='compare.html':scripts.append('release7.js')

@@ -1,7 +1,7 @@
 """Generate the static site from portfolio data. Python 3, standard library only."""
 from pathlib import Path
 import json, re, html, urllib.parse, os
-import release4, visual5, release6, release7, release8, release9, assets9, visual10, release103, release11, release12, release13, seo13
+import release4, visual5, release6, release7, release8, release9, assets9, visual10, release103, release11, release12, release13, seo13, forms14, services14, budget14
 from media_validation import validate_media
 ROOT=Path(__file__).resolve().parent
 VERSION=json.loads((ROOT/'package.json').read_text())['version']
@@ -62,6 +62,9 @@ def page(path,title,desc,body,active='',extra=''):
  body=release11.enhance(globals(),path,body)
  body=release12.enhance(globals(),path,body)
  body=release13.apply_release13(globals(),path,body)
+ body=services14.enhance(globals(),path,body)
+ body=budget14.enhance(globals(),path,body)
+ body=forms14.enhance(globals(),path,body)
  if path in ['index.html','about.html']: body+=release7.materials(globals())
  if path in ['index.html','contacts.html']:body+=release7.callback(globals())
  if path.startswith('projects/') and path.endswith('.html'):body+=release7.materials(globals(),path.split('/')[-1][:-5])
@@ -130,6 +133,8 @@ release4.pages(globals())
 release7.compare(globals())
 release9.pages(globals())
 release103.photo_page(globals())
+budget14.pages(globals())
+forms14.pages(globals())
 page('404.html','Страница не найдена','Вернуться на сайт ФАСАД.PRO.',intro('404','Страница<br>не найдена.','Возможно, адрес изменился. Перейдите на главную или откройте каталог проектов.')+'<div class="section error-actions">'+button('На главную','index.html')+button('Смотреть проекты','projects.html')+'</div>')
 (OUT/'favicon.svg').write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#252525"/><path d="M7 26V6h18M7 16h15" fill="none" stroke="white" stroke-width="4"/></svg>')
 (OUT/'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+''.join('<url><loc>https://facadepro.ru/'+('' if x=='index.html' else x)+'</loc></url>' for x in pages if x!='404.html')+'</urlset>')

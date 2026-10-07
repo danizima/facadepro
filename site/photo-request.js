@@ -8,9 +8,9 @@
   const project=JSON.parse(document.querySelector('#photo-projects')?.textContent||'[]').find(p=>p.id===new URLSearchParams(location.search).get('project'));
   if(project){const context=document.querySelector('#photo-project-context');context.hidden=false;context.textContent='Интересует похожий объект: '+project.title;}
   const limits={count:5,fileBytes:10*1024*1024,totalBytes:25*1024*1024};
-  let photos=[],busy=false,ready=false,key=window.facade.uuid();
+  let photos=[],busy=false,ready=false,key=window.facade.uuid(),continuation='';
   const size=bytes=>(bytes/1024/1024).toLocaleString('ru',{maximumFractionDigits:1})+' МБ';
-  const changed=()=>{key=window.facade.uuid();status.textContent='';};
+  const changed=()=>{key=window.facade.uuid();status.textContent='';const transfer=document.querySelector('#photo-transfer');if(transfer)transfer.hidden=true;};
   function draw(){
     preview.replaceChildren();
     photos.forEach((row,index)=>{
@@ -40,11 +40,16 @@
   for(const input of [chooser,camera])input.onchange=()=>{add([...input.files]);input.value='';};
   for(const eventName of ['dragover','dragenter'])drop.addEventListener(eventName,event=>{event.preventDefault();if(!busy&&ready)drop.classList.add('is-dragging');});
   for(const eventName of ['dragleave','drop'])drop.addEventListener(eventName,event=>{event.preventDefault();drop.classList.remove('is-dragging');if(eventName==='drop')add([...event.dataTransfer.files]);});
-  form.addEventListener('input',event=>{if(!busy&&event.target.name)changed();});
+  form.addEventListener('input',event=>{event.target.setCustomValidity?.('');event.target.removeAttribute('aria-invalid');if(!busy&&event.target.name)changed();});
   form.addEventListener('invalid',event=>{const details=event.target.closest('details');if(details)details.open=true;},true);
+  function showContinuation(value){continuation=typeof value==='string'&&/^\/followup\.html#[a-f0-9]{64}$/.test(value)?new URL(value,location.origin).href:'';const panel=document.querySelector('#photo-continuation');if(!panel)return;panel.hidden=!continuation;document.querySelector('#photo-continuation-status').textContent='';if(continuation)document.querySelector('#photo-open-continuation').href=continuation;}
+  document.querySelector('#photo-copy-continuation')?.addEventListener('click',()=>copyText(continuation,document.querySelector('#photo-continuation-status')));
+  document.querySelector('#photo-save-continuation')?.addEventListener('click',()=>{if(!continuation)return;const a=document.createElement('a'),url=URL.createObjectURL(new Blob(['Личная ссылка на обращение ФАСАД.PRO\n'+continuation+'\n\nПередавайте её только участникам вашего проекта.'],{type:'text/plain;charset=utf-8'}));a.href=url;a.download='ФАСАД_PRO_личная_ссылка.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);document.querySelector('#photo-continuation-status').textContent='Личная ссылка подготовлена к сохранению.';});
+  function upload(payload){return new Promise((resolve,reject)=>{const xhr=new XMLHttpRequest(),panel=document.querySelector('#photo-transfer'),bar=document.querySelector('#photo-progress'),label=document.querySelector('#photo-progress-text');if(panel){panel.hidden=false;bar.value=0;label.textContent='Загрузка фотографий…';}xhr.open('POST','/api/photo-request');xhr.timeout=90000;xhr.upload.onprogress=event=>{if(!bar)return;if(event.lengthComputable){const percent=Math.min(100,Math.round(event.loaded/event.total*100));bar.value=percent;label.textContent=percent<100?'Загрузка фотографий: '+percent+'%':'Фотографии переданы. Ожидаем подтверждение сервера…';}else{bar.removeAttribute('value');label.textContent='Загрузка фотографий…';}};xhr.onload=()=>{let result;try{result=JSON.parse(xhr.responseText);}catch{reject(Error('Не удалось подтвердить получение. Фотографии остались в форме — повторите отправку.'));return;}if(xhr.status<200||xhr.status>=300){reject(Error(result.error||'Не удалось отправить обращение. Попробуйте ещё раз.'));return;}if(result.received!==true||typeof result.reference!=='string'){reject(Error('Не удалось подтвердить получение. Повторите отправку.'));return;}if(bar){bar.value=100;label.textContent='Фотографии получены.';}resolve(result);};xhr.onerror=()=>reject(new TypeError('Связь прервалась.'));xhr.ontimeout=()=>reject(new DOMException('Время ожидания истекло.','TimeoutError'));xhr.send(payload);});}
   form.onsubmit=async event=>{
     event.preventDefault();if(busy||!ready)return;
     if(!photos.length){fileStatus.textContent='Добавьте хотя бы одну фотографию объекта.';document.querySelector('#choose-photos').focus();return;}
+    const projectLink=form.elements.projectLink;if(projectLink){projectLink.setCustomValidity('');if(projectLink.value.trim()){try{const url=new URL(projectLink.value.trim());if(url.protocol!=='https:'||url.username||url.password||projectLink.value.trim().length>2000||url.href.length>2000)throw Error();projectLink.value=url.href;}catch{projectLink.setCustomValidity('Добавьте ссылку, которая начинается с https://, без логина и пароля.');}}projectLink.setAttribute('aria-invalid',String(!projectLink.checkValidity()));}
     if(!form.reportValidity())return;
     const phone=form.elements.phone.value;
     if(!/^[+\d\s().-]+$/.test(phone)||phone.replace(/\D/g,'').length<7||phone.replace(/\D/g,'').length>15){status.textContent='Проверьте номер телефона.';form.elements.phone.focus();return;}
@@ -53,16 +58,13 @@
     photos.forEach(row=>payload.append('files',row.file,row.file.name));
     busy=true;fieldset.disabled=true;status.textContent='Отправляем фотографии…';
     try{
-      const response=await fetch('/api/photo-request',{method:'POST',body:payload,signal:AbortSignal.timeout(90000)});
-      let result;try{result=await response.json();}catch{throw Error('Не удалось подтвердить получение. Фотографии остались в форме — повторите отправку.');}
-      if(!response.ok)throw Error(result.error||'Не удалось отправить обращение. Попробуйте ещё раз.');
-      if(!result.received||typeof result.reference!=='string')throw Error('Не удалось подтвердить получение. Повторите отправку.');
+      const result=await upload(payload);showContinuation(result.continuationUrl);
       document.querySelector('#photo-reference').textContent='Обращение '+result.reference+' · фотографий: '+photos.length;
       photos.forEach(row=>URL.revokeObjectURL(row.url));photos=[];draw();form.reset();form.hidden=true;success.hidden=false;success.focus();status.textContent='';
     }catch(error){status.textContent=error.name==='TimeoutError'?'Отправка заняла больше времени. Фотографии остались в форме — повторите попытку.':error instanceof TypeError?'Связь прервалась. Фотографии остались в форме — повторите отправку.':error.message;status.focus();}
     finally{busy=false;fieldset.disabled=false;}
   };
-  document.querySelector('#photo-again').onclick=()=>{form.reset();key=window.facade.uuid();fileStatus.textContent='';status.textContent='';success.hidden=true;form.hidden=false;document.querySelector('#choose-photos').focus();};
+  document.querySelector('#photo-again').onclick=()=>{form.reset();key=window.facade.uuid();fileStatus.textContent='';status.textContent='';showContinuation(null);const transfer=document.querySelector('#photo-transfer');if(transfer)transfer.hidden=true;success.hidden=true;form.hidden=false;document.querySelector('#choose-photos').focus();};
   addEventListener('pagehide',event=>{if(!event.persisted)photos.forEach(row=>URL.revokeObjectURL(row.url));});
   void(async()=>{
     try{

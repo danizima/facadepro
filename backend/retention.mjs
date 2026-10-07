@@ -21,9 +21,10 @@ export function initializeRetention(db, now = new Date()) {
 }
 
 export function retentionCandidates(db, now = new Date()) {
+  const protectPortal=db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lead_portals'").get()?` AND NOT EXISTS(SELECT 1 FROM lead_portals p WHERE p.lead_id=leads.id AND p.revoked=0 AND p.expires>${now.getTime()})`:'';
   return db.prepare(`SELECT id,revision,closed_at FROM leads
     WHERE status='closed' AND closed_at<>'' AND closed_at<?
-      AND (next_contact='' OR next_contact<=?)`).all(
+      AND (next_contact='' OR next_contact<=?)${protectPortal}`).all(
     new Date(now.getTime() - CLOSED_RETENTION_DAYS * DAY).toISOString(), now.toISOString().slice(0,10));
 }
 
@@ -35,12 +36,14 @@ export async function purgeClosedLeads(db, dataDir, verifiedSnapshot, now = new 
     const saved=backedUp.get(row.id);
     return saved?.revision===row.revision && saved.closed_at===row.closed_at && saved.status==='closed';
   });
-  const files=[];
+  const files=[],quoteFiles=[];
+  const hasQuotes=Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='quote_versions'").get());
   // No awaits inside this transaction: reopening/updating cannot race deletion.
   db.exec('BEGIN IMMEDIATE');
   try {
     for (const row of candidates) {
       files.push(...db.prepare('SELECT id FROM files WHERE lead_id=?').all(row.id).map(file=>file.id));
+      if(hasQuotes)quoteFiles.push(...db.prepare('SELECT file_key FROM quote_versions WHERE lead_id=?').all(row.id).map(file=>file.file_key));
       db.prepare('DELETE FROM leads WHERE id=?').run(row.id);
     }
     db.exec('COMMIT');
@@ -50,5 +53,6 @@ export async function purgeClosedLeads(db, dataDir, verifiedSnapshot, now = new 
     if (!/^[a-f0-9-]{36}$/.test(id)) { orphanedFiles++; continue; }
     try { await rm(path.join(dataDir,'uploads',id),{force:true}); } catch { orphanedFiles++; }
   }
-  return {removedLeads:candidates.length,removedFiles:files.length-orphanedFiles,orphanedFiles};
+  for(const key of quoteFiles){if(!/^quotes\/[a-f0-9-]{36}\.pdf$/.test(key)){orphanedFiles++;continue;}try{await rm(path.join(dataDir,key),{force:true});}catch{orphanedFiles++;}}
+  return {removedLeads:candidates.length,removedFiles:files.length+quoteFiles.length-orphanedFiles,orphanedFiles};
 }

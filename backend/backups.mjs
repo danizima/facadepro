@@ -8,7 +8,7 @@ import {CLOSED_RETENTION_DAYS,purgeClosedLeads} from './retention.mjs';
 const DAY=86400000;
 const NAME=/^facadepro-\d{8}T\d{9}Z-[a-f0-9]{8}$/;
 const ENV_KEYS=['NODE_ENV','PUBLIC_URL','PORT','TRUST_PROXY','COOKIE_SECURE','SMTP_HOST','SMTP_PORT','SMTP_SECURITY','SMTP_FROM','SMTP_USER','SMTP_PASSWORD','LEAD_TO','TELEGRAM_BOT_TOKEN','TELEGRAM_CHAT_ID'];
-const allowed=key=>['facadepro.sqlite','secret','runtime-config.json'].includes(key)||/^(uploads|media|materials)\/[a-zA-Z0-9_.-]+$/.test(key);
+const allowed=key=>['facadepro.sqlite','secret','runtime-config.json'].includes(key)||/^(uploads|media|materials|quotes)\/[a-zA-Z0-9_.-]+$/.test(key);
 function safeFile(root,key) {
   if(typeof key!=='string'||!allowed(key)||key.split('/').some(part=>part==='.'||part==='..'))throw Error('Invalid backup path');
   return path.join(root,key);
@@ -25,6 +25,7 @@ async function putFile(source,target) {
 }
 function databaseReferences(db) {
   const refs=db.prepare('SELECT id,size FROM files').all().map(row=>({path:'uploads/'+row.id,size:row.size}));
+  if(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='quote_versions'").get())refs.push(...db.prepare('SELECT file_key,size FROM quote_versions').all().map(row=>({path:row.file_key,size:row.size})));
   const walk=value=>{
     if(typeof value==='string'&&/^(media|materials)\//.test(value))refs.push({path:value});
     else if(Array.isArray(value))value.forEach(walk);
@@ -35,7 +36,7 @@ function databaseReferences(db) {
 }
 export async function verifyBackup(directory) {
   const dirInfo=await lstat(directory);if(!dirInfo.isDirectory()||dirInfo.isSymbolicLink())throw Error('Invalid backup directory');
-  for(const folder of ['uploads','media','materials']) {
+  for(const folder of ['uploads','media','materials','quotes']) {
     try {const info=await lstat(path.join(directory,folder));if(!info.isDirectory()||info.isSymbolicLink())throw Error('Invalid backup data directory');}
     catch(error){if(error.code!=='ENOENT')throw error;}
   }
@@ -90,7 +91,7 @@ export async function createBackup({db,dataDir,backupDir=path.join(dataDir,'back
     const runtime=Object.fromEntries(ENV_KEYS.filter(k=>environment[k]!==undefined).map(k=>[k,String(environment[k])]));
     await writeFile(path.join(stage,'runtime-config.json'),JSON.stringify(runtime),{mode:0o600,flag:'wx'});
     const files=['facadepro.sqlite','secret','runtime-config.json'];
-    for(const folder of ['uploads','media','materials']) {
+    for(const folder of ['uploads','media','materials','quotes']) {
       await mkdir(path.join(stage,folder),{mode:0o700});
       const source=path.join(dataDir,folder);
       let entries;try{const info=await lstat(source);if(!info.isDirectory()||info.isSymbolicLink())throw Error('Invalid source data directory');entries=await readdir(source);}catch(error){if(error.code==='ENOENT')continue;throw error;}
@@ -139,7 +140,7 @@ export async function restoreBackup(directory,target) {
     const manifest=JSON.parse(await readFile(path.join(directory,'manifest.json'),'utf8'));
     for(const entry of manifest.files)await putFile(safeFile(directory,entry.path),safeFile(stage,entry.path));
     await putFile(path.join(directory,'manifest.json'),path.join(stage,'manifest.json'));
-    for(const folder of ['uploads','media','materials'])await mkdir(path.join(stage,folder),{recursive:true,mode:0o700});
+    for(const folder of ['uploads','media','materials','quotes'])await mkdir(path.join(stage,folder),{recursive:true,mode:0o700});
     await verifyBackup(stage);
     // mkdir is exclusive: refuse an existing target even if it appeared while
     // copying. A restore never overlays a running DATA_DIR.

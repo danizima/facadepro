@@ -8,7 +8,7 @@ import {existsSync,createReadStream} from 'node:fs';
 import {spawn} from 'node:child_process';
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import path from 'node:path';
-import {ROOT,DATA,db,content,hash,passwordValid,passwordHash,rate,audit,transaction,cleanSession,fail,text,emailOK,validateContent,SERVICE_IDS,STATUSES} from './backend/store.mjs';
+import {ROOT,DATA,db,content,hash,privateHash,passwordValid,passwordHash,rate,audit,transaction,cleanSession,fail,text,emailOK,validateContent,SERVICE_IDS,STATUSES} from './backend/store.mjs';
 import {createPortfolio} from './backend/portfolio.mjs';
 import {createPublicPortfolio} from './backend/public-portfolio.mjs';
 import {selectKit,createKit,kitDocuments} from './backend/kit.mjs';
@@ -16,10 +16,20 @@ import {servePublicFile} from './backend/public-files.mjs';
 import {listLeads,updateFollowup,reminders,todayParam,staff} from './backend/followups.mjs';
 import {initializeRetention} from './backend/retention.mjs';
 import {createMaintenance} from './backend/backups.mjs';
+import {createClientPortal} from './backend/client-portal.mjs';
+import {createQuotes} from './backend/quotes14.mjs';
+import {createBudget} from './backend/budget14.mjs';
 const solutionCatalog=JSON.parse(await readFile(path.join(ROOT,'source/solutions.json'),'utf8'));
 const site=path.join(ROOT,'site');
 const VERSION=JSON.parse(await readFile(path.join(ROOT,'package.json'),'utf8')).version;
 const publicPortfolio=createPublicPortfolio({readContent:content,generate:createPortfolio,version:VERSION});
+const portal=createClientPortal({db,DATA,hash,privateHash,text,fail,content,transaction,signature,onAddition:({leadId,additionId})=>{
+ const cfg=notificationConfig();
+ db.prepare("INSERT INTO outbox(id,lead_id,recipient,kind,dedupe) VALUES(?,?,?,'addition',?)").run(randomUUID(),leadId,cfg.leadTo,'email-addition:'+additionId);
+ if(cfg.telegramEnabled)db.prepare("INSERT INTO outbox(id,lead_id,recipient,kind,channel,dedupe) VALUES(?,?,?,'addition','telegram',?)").run(randomUUID(),leadId,cfg.telegramChat,'telegram-addition:'+additionId);
+}});
+const quotes=createQuotes({db,dataDir:DATA,fail,text,audit});
+const budget=createBudget({db,fail,text,audit});
 initializeRetention(db);
 const maintenance=createMaintenance({db,dataDir:DATA,version:VERSION});
 await mkdir(path.join(DATA,'materials'),{recursive:true,mode:0o700});
@@ -51,6 +61,7 @@ const serveFile=(req,res,file,extra={})=>servePublicFile(req,res,file,types,extr
 function signature(buf,ext){const b=buf.subarray(0,256);if(ext==='pdf')return b.subarray(0,5).toString()==='%PDF-';if(['jpg','jpeg'].includes(ext))return b[0]===255&&b[1]===216&&b[2]===255;if(ext==='png')return b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]));if(ext==='webp')return b.subarray(0,4).toString()==='RIFF'&&b.subarray(8,12).toString()==='WEBP';if(['zip','docx','xlsx'].includes(ext))return b[0]===80&&b[1]===75&&[3,5,7].includes(b[2]);if(ext==='dwg')return /^AC10\d{2}/.test(b.toString());if(ext==='dxf')return /SECTION|AutoCAD Binary DXF/.test(b.toString());if(ext==='txt')return !buf.includes(0);return false;}
 async function getFiles(form,imagesOnly=false,maxCount=imagesOnly?1:5){const entries=form.getAll('files').filter(f=>typeof f!=='string'&&f.size);if(entries.length>maxCount)throw fail(422,'Допустимо не более '+maxCount+' файлов.');let total=0;const files=[];for(const f of entries){total+=f.size;if(f.size>FILE_LIMIT||total>TOTAL_LIMIT)throw fail(413,'Не более 10 МБ на файл и 25 МБ суммарно.');const name=path.basename(f.name.replaceAll('\\','/')).replace(/[\r\n\u0000-\u001f]/g,'').slice(0,180),ext=name.split('.').at(-1).toLowerCase(),bytes=Buffer.from(await f.arrayBuffer());if((imagesOnly&&!['jpg','jpeg','png','webp'].includes(ext))||!signature(bytes,ext))throw fail(422,'Неподдерживаемый или повреждённый файл: '+name);files.push({id:randomUUID(),name,size:f.size,ext,bytes});}return files;}
 function leadPayload(f){const get=(name,max,required=false)=>text(f.get(name)||'',max,required);const services=[...new Set(f.getAll('service'))];if(!services.length||services.some(s=>!SERVICE_IDS.includes(s)))throw fail(422,'Выберите направление работ.');const p={services,kind:get('kind',20)||'request',object:get('object',100,true),city:get('city',120,true),area:get('area',30),timing:get('timing',100,true),documents:get('documents',150),comment:get('comment',3000),name:get('name',100,true),company:get('company',150),phone:get('phone',40),email:get('email',200),height:get('height',80),system:get('system',150),deadline:get('deadline',30),solution:get('solution',20),audience:get('audience',20),selection:get('selection',48)};
+ p.projectLink=projectLink(get('projectLink',2000));p.scope=get('scope',30);if(p.scope&&!['installation','supply-installation','engineering','supply','height'].includes(p.scope))throw fail(422,'Проверьте состав работ.');
  if(p.audience&&!['contractor','developer','owner'].includes(p.audience))throw fail(422,'Проверьте выбранный сценарий.');if(p.selection){const shared=getShowcase(p.selection);p.selectionTitle=shared.title;} 
  if(p.solution&&!solutionCatalog.some(s=>s.id===p.solution))throw fail(422,'Неизвестная задача.');if(!['request','quote'].includes(p.kind))throw fail(422,'Неизвестный тип заявки.');if(!p.email&&!p.phone)throw fail(422,'Укажите телефон или email.');if(p.email&&!emailOK(p.email))throw fail(422,'Проверьте email.');if(p.phone&&(!/^[+\d\s().-]+$/.test(p.phone)||p.phone.replace(/\D/g,'').length<7||p.phone.replace(/\D/g,'').length>15))throw fail(422,'Проверьте телефон.');if(p.area&&(!Number.isFinite(Number(p.area))||Number(p.area)<1||Number(p.area)>1e7))throw fail(422,'Проверьте площадь.');if(f.get('consent')!=='yes')throw fail(422,'Подтвердите согласие на обработку данных заявки.');if(p.kind==='quote'&&!p.company)throw fail(422,'Для запроса КП укажите компанию или «Частный заказчик».');p.consentAt=new Date().toISOString();p.policyVersion='2026-09-27';p.comparedProjects=comparedProjects(f.get('comparedProjects'));p.sourcePage=cleanPage(get('sourcePage',150)||'/request.html');return p;}
 function comparedProjects(value){
@@ -73,7 +84,7 @@ function photoPayload(f){
  if(f.get('consent')!=='yes')throw fail(422,'Подтвердите согласие на обработку данных.');
  const project=text(f.get('project')||'',80);
  if(project&&!content().projects.some(p=>p.id===project&&p.published!==false))throw fail(422,'Выбранный проект недоступен. Обновите страницу формы.');
- return {kind:'photo',services:[],object:'Обращение с фотографиями',city:text(f.get('city')||'',120)||'Не указан',timing:'Уточнить',name:text(f.get('name')||'',100)||'Не указано',phone,email,company:'',comment:text(f.get('comment')||'',1500),comparedProjects:comparedProjects(project),consentAt:new Date().toISOString(),policyVersion:'2026-09-27',sourcePage:cleanPage(text(f.get('sourcePage')||'/photo-request.html',150))};
+ return {projectLink:projectLink(text(f.get('projectLink')||'',2000)),kind:'photo',services:[],object:'Обращение с фотографиями',city:text(f.get('city')||'',120)||'Не указан',timing:'Уточнить',name:text(f.get('name')||'',100)||'Не указано',phone,email,company:'',comment:text(f.get('comment')||'',1500),comparedProjects:comparedProjects(project),consentAt:new Date().toISOString(),policyVersion:'2026-09-27',sourcePage:cleanPage(text(f.get('sourcePage')||'/photo-request.html',150))};
 }
 async function materialFile(req,res,key){
  if(!/^materials\/[a-f0-9-]{36}\.(pdf|mp4|webm)$/.test(key))throw fail(404,'Файл не найден.');
@@ -92,10 +103,12 @@ async function materialFile(req,res,key){
  const stream=createReadStream(file,{start,end});stream.on('error',()=>res.destroy());res.on('close',()=>stream.destroy());stream.pipe(res);
 }
 function cleanPage(s){const p=String(s).split('?')[0].split('#')[0];return /^\/(?:[a-z0-9-]+\/)?[a-z0-9-]*\.?[a-z]*$/.test(p)&&p.length<=150&&!p.startsWith('/admin')?p:'/';}
+function projectLink(value){if(!value)return '';let u;try{u=new URL(value);}catch{throw fail(422,'Проверьте ссылку на проект.');}if(u.protocol!=='https:'||u.username||u.password||!u.hostname||/[\s\u0000-\u001f]/.test(value))throw fail(422,'Укажите HTTPS-ссылку на проект без логина и пароля.');return value;}
 function mailMessage(row){const lead=db.prepare('SELECT * FROM leads WHERE id=?').get(row.lead_id),p=JSON.parse(lead.payload),settings=content().settings,base=PUBLIC_URL||'';
+ if(row.kind==='addition'){const rows=db.prepare('SELECT created_at,comment,project_link FROM lead_additions WHERE lead_id=? ORDER BY created_at DESC,id DESC LIMIT 5').all(lead.id);return {to:row.recipient,subject:'ФАСАД.PRO: новые материалы '+lead.reference,body:[`Дополнение к заявке ${lead.reference}`,`Клиент: ${p.name}`,rows.map(r=>[r.created_at,r.comment,r.project_link].filter(Boolean).join('\n')).join('\n\n'),`Открыть материалы в панели: ${base}/admin/#leads/${lead.id}`].join('\n\n'),message_id:'<'+row.id+'@facadepro.ru>'};}
  if(row.kind.startsWith('reminder_'))return {to:row.recipient,subject:'ФАСАД.PRO: напоминание '+lead.reference,body:telegramMessage(row,lead)+'\n\nСледующее действие: '+(lead.next_action||'Взять заявку в работу'),message_id:'<'+row.id+'@facadepro.ru>'};
  if(row.kind==='receipt')return {to:row.recipient,subject:'ФАСАД.PRO: заявка '+lead.reference+' принята',body:`Здравствуйте, ${p.name}!\n\nМы получили вашу заявку ${lead.reference}. Менеджер свяжется с вами для уточнения деталей.\n\n${settings.manager}\n${settings.phone}\n${settings.email}\n\nЭто подтверждение получения заявки, а не согласование цены или срока.`,message_id:`<${row.id}@facadepro.ru>`};
- const files=db.prepare('SELECT name,size FROM files WHERE lead_id=?').all(lead.id);return {to:row.recipient,reply_to:p.email||undefined,subject:`${p.kind==='quote'?'Запрос КП':p.kind==='callback'?'Обратный звонок':p.kind==='photo'?'Фотографии объекта':'Новая заявка'} ${lead.reference} — ФАСАД.PRO`,body:[`Заявка: ${lead.reference}`,`Работы: ${p.services.map(s=>serviceNames[s]).join(', ')||'Уточнить при звонке'}`,`Объект: ${p.object}`,`Город: ${p.city}`,`Площадь: ${p.area||'Уточнить'}`,`Начало: ${p.timing}`,`Имя: ${p.name}`,`Компания: ${p.company||'—'}`,`Телефон: ${p.phone||'—'}`,`Email: ${p.email||'—'}`,`Комментарий: ${p.comment||'—'}`,`Файлы: ${files.map(f=>f.name).join(', ')||'Нет'}`,'',`Открыть в панели: ${base}/admin/#leads/${lead.id}`].join('\n'),message_id:`<${row.id}@facadepro.ru>`};}
+ const files=db.prepare('SELECT name,size FROM files WHERE lead_id=?').all(lead.id);return {to:row.recipient,reply_to:p.email||undefined,subject:`${p.kind==='quote'?'Запрос КП':p.kind==='callback'?'Обратный звонок':p.kind==='photo'?'Фотографии объекта':'Новая заявка'} ${lead.reference} — ФАСАД.PRO`,body:[`Заявка: ${lead.reference}`,`Работы: ${p.services.map(s=>serviceNames[s]).join(', ')||'Уточнить при звонке'}`,`Объект: ${p.object}`,`Город: ${p.city}`,`Площадь: ${p.area||'Уточнить'}`,`Начало: ${p.timing}`,`Имя: ${p.name}`,`Компания: ${p.company||'—'}`,`Телефон: ${p.phone||'—'}`,`Email: ${p.email||'—'}`,`Комментарий: ${p.comment||'—'}`,`Ссылка на проект: ${p.projectLink||'—'}`,`Состав работ: ${p.scope||'Уточнить'}`,`Файлы: ${files.map(f=>f.name).join(', ')||'Нет'}`,'',`Открыть в панели: ${base}/admin/#leads/${lead.id}`].join('\n'),message_id:`<${row.id}@facadepro.ru>`};}
 async function flushMail(){
  if(mailWorking)return;mailWorking=true;
  try{
@@ -123,6 +136,25 @@ async function cleanup(){cleanSession();db.prepare('DELETE FROM events WHERE cre
 function stats(days){const since=new Date(Date.now()-days*86400000).toISOString(),get=(sql,...args)=>db.prepare(sql).all(...args);const sessions=db.prepare("SELECT COUNT(DISTINCT session_id) n FROM events WHERE event='page_view' AND created>=?").get(since).n;const stages=['page_view','request_start','step_2','step_3'];const funnel=stages.map(event=>({event,count:db.prepare('SELECT COUNT(DISTINCT session_id) n FROM events WHERE event=? AND created>=?').get(event,since).n}));funnel.push({event:'submitted',count:db.prepare('SELECT COUNT(DISTINCT session_id) n FROM leads WHERE created>=? AND session_id IS NOT NULL').get(since).n});return {days,sessions,leadPages:get("SELECT json_extract(payload,'$.sourcePage') page,COUNT(*) count FROM leads WHERE created>=? GROUP BY page ORDER BY count DESC",since),totalLeads:db.prepare('SELECT COUNT(*) n FROM leads WHERE created>=?').get(since).n,funnel,pages:get("SELECT page,COUNT(*) views,COUNT(DISTINCT session_id) visitors FROM events WHERE event='page_view' AND created>=? GROUP BY page ORDER BY views DESC LIMIT 15",since),services:get("SELECT detail service,COUNT(DISTINCT session_id) visitors FROM events WHERE event='service_interest' AND created>=? GROUP BY detail ORDER BY visitors DESC",since),sources:get("SELECT source,COUNT(DISTINCT session_id) visitors FROM events WHERE event='page_view' AND created>=? GROUP BY source ORDER BY visitors DESC LIMIT 10",since),leadsByDay:get('SELECT substr(created,1,10) day,COUNT(*) count FROM leads WHERE created>=? GROUP BY day ORDER BY day',since)};}
 const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new URL(req.url,origin(req));const route=decodeURIComponent(url.pathname);if(['POST','PUT','DELETE','PATCH'].includes(req.method))sameOrigin(req);if(req.method==='OPTIONS')throw fail(405,'Метод не поддерживается.');
  if(route==='/healthz'){json(res,200,{ok:true,version:VERSION});return;}
+ if(route==='/api/budget/config'&&req.method==='GET'){json(res,200,budget.config());return;}
+ if(route==='/api/budget/estimate'&&req.method==='POST'){
+  if(!rate('budget:'+ip(req),120,600000))throw fail(429,'Подождите перед следующим расчётом.');
+  json(res,200,budget.estimate(await jsonBody(req,4000)));return;
+ }
+ if(route==='/api/client/lead'||route==='/api/client/lead/append'){
+  res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Robots-Tag','noindex, nofollow');
+  if(!rate('client:'+ip(req),120,600000))throw fail(429,'Подождите перед следующим запросом.');
+  const token=portal.tokenFromHeader(req.headers.authorization);
+  if(route==='/api/client/lead'&&req.method==='GET'){json(res,200,portal.read(token));return;}
+  if(route==='/api/client/lead/append'&&req.method==='POST'){
+   if(!rate('client-write:'+ip(req),20,3600000))throw fail(429,'Подождите перед отправкой новых материалов.');
+   portal.read(token);
+   const f=await multipart(req);
+   const result=await portal.append(token,{idempotency:f.get('idempotency'),comment:f.get('comment')||'',projectLink:f.get('projectLink')||''},await getFiles(f));
+   json(res,200,result);if(!result.replayed)void flushMail();return;
+  }
+  throw fail(405,'Метод не поддерживается.');
+ }
  if(route==='/downloads/portfolio.pdf'){
   if(!['GET','HEAD'].includes(req.method))throw fail(405,'Метод не поддерживается.');
   if(!rate('portfolio:'+ip(req),12,600000))throw fail(429,'Слишком много подборок. Попробуйте через несколько минут.');
@@ -167,10 +199,10 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
  }
  if(['/api/requests','/api/callback','/api/photo-request'].includes(route)&&req.method==='POST'){
   if(!rate('lead:'+ip(req),10,3600000))throw fail(429,'Слишком много заявок. Попробуйте позже или позвоните менеджеру.');
-  const callback=route==='/api/callback',photo=route==='/api/photo-request';let f;if(callback){const b=await jsonBody(req,6000);f=new FormData();for(const k of ['name','phone','preferredTime','consent','website','idempotency','sourcePage','comparedProjects','analyticsSession']){if(b[k]!==undefined&&typeof b[k]!=='string')throw fail(422,'Проверьте поля формы.');f.set(k,b[k]??'');}}else f=await multipart(req);if(f.get('website'))throw fail(422,'Проверьте форму.');const key=text(f.get('idempotency')||'',80,true);if(!/^[a-f0-9-]{36}$/.test(key))throw fail(422,'Обновите страницу формы.');const p=callback?callbackPayload(f):photo?photoPayload(f):leadPayload(f),files=callback?[]:await getFiles(f,photo,5);if(photo&&!files.length)throw fail(422,'Добавьте хотя бы одну фотографию объекта.');const digest=hash(JSON.stringify(p).replace(/"consentAt":"[^"]+",/,'')+files.map(x=>x.name+hash(x.bytes)).join('|'));const prior=db.prepare('SELECT reference,digest FROM leads WHERE idempotency=?').get(key);if(prior){if(prior.digest!==digest)throw fail(409,'Данные изменились. Обновите форму и повторите отправку.');json(res,200,{reference:prior.reference,received:true});return;}
+  const callback=route==='/api/callback',photo=route==='/api/photo-request';let f;if(callback){const b=await jsonBody(req,6000);f=new FormData();for(const k of ['name','phone','preferredTime','consent','website','idempotency','sourcePage','comparedProjects','analyticsSession']){if(b[k]!==undefined&&typeof b[k]!=='string')throw fail(422,'Проверьте поля формы.');f.set(k,b[k]??'');}}else f=await multipart(req);if(f.get('website'))throw fail(422,'Проверьте форму.');const key=text(f.get('idempotency')||'',80,true);if(!/^[a-f0-9-]{36}$/.test(key))throw fail(422,'Обновите страницу формы.');const p=callback?callbackPayload(f):photo?photoPayload(f):leadPayload(f),files=callback?[]:await getFiles(f,photo,5);if(photo&&!files.length)throw fail(422,'Добавьте хотя бы одну фотографию объекта.');const digest=hash(JSON.stringify(p).replace(/"consentAt":"[^"]+",/,'')+files.map(x=>x.name+hash(x.bytes)).join('|'));const prior=db.prepare('SELECT id,reference,digest FROM leads WHERE idempotency=?').get(key);if(prior){if(prior.digest!==digest)throw fail(409,'Данные изменились. Обновите форму и повторите отправку.');json(res,200,{reference:prior.reference,received:true,...portal.issue(prior.id)});return;}
   const id=randomUUID(),reference='FP-'+new Date().toISOString().slice(0,10).replaceAll('-','')+'-'+randomBytes(4).toString('hex').toUpperCase();const sid=/^[a-f0-9-]{36}$/.test(f.get('analyticsSession')||'')?f.get('analyticsSession'):null;
   try{for(const file of files)await writeFile(path.join(DATA,'uploads',file.id),file.bytes,{mode:0o600,flag:'wx'});transaction(()=>{db.prepare('INSERT INTO leads(id,reference,created,kind,payload,idempotency,digest,session_id) VALUES(?,?,?,?,?,?,?,?)').run(id,reference,new Date().toISOString(),p.kind,JSON.stringify(p),key,digest,sid);for(const file of files)db.prepare('INSERT INTO files VALUES(?,?,?,?,?)').run(file.id,id,file.name,file.size,file.ext);db.prepare('INSERT INTO outbox(id,lead_id,recipient,kind) VALUES(?,?,?,?)').run(randomUUID(),id,notificationConfig().leadTo,'manager');if(p.email)db.prepare('INSERT INTO outbox(id,lead_id,recipient,kind) VALUES(?,?,?,?)').run(randomUUID(),id,p.email,'receipt');queueTelegram(id);});}catch(e){for(const file of files)await rm(path.join(DATA,'uploads',file.id),{force:true});throw e;}
-  json(res,201,{reference,received:true});void flushMail();return;
+  json(res,201,{reference,received:true,...portal.issue(id)});void flushMail();return;
  }
  if(route==='/api/events'&&req.method==='POST'){
   if(!rate('events:'+ip(req),200,60000))throw fail(429,'Лимит статистики.');const b=await jsonBody(req,4000);if(!/^[a-f0-9-]{36}$/.test(b.session||'')||!['page_view','request_start','step_2','step_3','service_interest','contact_click','portfolio_download'].includes(b.event))throw fail(422,'Некорректное событие.');const detail=SERVICE_IDS.includes(b.detail)?b.detail:['request','quote','phone','email'].includes(b.detail)?b.detail:'';const source=/^[a-zA-Z0-9_.-]{1,80}$/.test(b.source||'')?b.source:'direct';db.prepare('INSERT INTO events(created,session_id,event,page,detail,source) VALUES(?,?,?,?,?,?)').run(new Date().toISOString(),b.session,b.event,cleanPage(b.page||'/'),detail,source);json(res,202,{ok:true});return;
@@ -181,6 +213,33 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
  if(route.startsWith('/api/admin/')){
   const s=session(req,!['GET','HEAD'].includes(req.method));
   if(route==='/api/admin/session'&&req.method==='GET'){json(res,200,{username:s.username,csrf:s.csrf,smtpConfigured:notificationConfig().emailEnabled});return;}
+  if(route==='/api/admin/budget'){
+   if(req.method==='GET'){json(res,200,budget.config());return;}
+   if(req.method==='PUT'){json(res,200,budget.save(await jsonBody(req,30000),s.username));return;}
+   throw fail(405,'Метод не поддерживается.');
+  }
+  const portalMatch=route.match(/^\/api\/admin\/leads\/([a-f0-9-]{36})\/portal$/);
+  if(portalMatch){
+   if(req.method==='GET'){json(res,200,portal.admin(portalMatch[1]));return;}
+   if(req.method==='POST'){const input=await jsonBody(req,5000);const result=portal.adminAction(portalMatch[1],input);audit(s.username,'client_link_'+input.action,portalMatch[1]);json(res,200,result);return;}
+   throw fail(405,'Метод не поддерживается.');
+  }
+  const quotesMatch=route.match(/^\/api\/admin\/leads\/([a-f0-9-]{36})\/quotes(?:\/([a-f0-9-]{36})(\/file)?)?$/);
+  if(quotesMatch){
+   const [,leadId,quoteId,file]=quotesMatch;
+   if(!quoteId&&req.method==='GET'){json(res,200,quotes.list(leadId));return;}
+   if(!quoteId&&req.method==='POST'){
+    if(!rate('quotes:'+s.username,30,600000))throw fail(429,'Подождите перед загрузкой нового КП.');
+    const result=await quotes.upload(leadId,await multipart(req,16*1024*1024),s.username);json(res,result.duplicate?200:201,result);return;
+   }
+   if(quoteId&&!file&&req.method==='PATCH'){json(res,200,quotes.update(leadId,quoteId,await jsonBody(req,4000),s.username));return;}
+   if(file&&['GET','HEAD'].includes(req.method)){
+    const f=await quotes.download(leadId,quoteId);audit(s.username,'quote_downloaded',quoteId);
+    if(await serveFile(req,res,f.path,{'Content-Disposition':disposition(f.name),'Content-Type':f.mime,'Cache-Control':'private, no-store'}))return;
+    throw fail(404,'Файл КП недоступен.');
+   }
+   throw fail(405,'Метод не поддерживается.');
+  }
   if(route==='/api/admin/maintenance'&&req.method==='GET'){json(res,200,await maintenance.status());return;}
   if(route==='/api/admin/logout'&&req.method==='POST'){db.prepare('DELETE FROM sessions WHERE hash=?').run(s.hash);json(res,200,{ok:true},{'Set-Cookie':'fp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0'+(secureCookie?'; Secure':'')});return;}
   if(route==='/api/admin/password'&&req.method==='POST'){const b=await jsonBody(req,4000);if(!passwordValid(text(b.current,300,true),db.prepare('SELECT password FROM admins WHERE username=?').get(s.username).password))throw fail(422,'Текущий пароль неверен.');const pass=text(b.password,300,true);if(pass.length<14)throw fail(422,'Минимум 14 символов.');db.prepare('UPDATE admins SET password=? WHERE username=?').run(passwordHash(pass),s.username);db.prepare('DELETE FROM sessions WHERE username=? AND hash<>?').run(s.username,s.hash);audit(s.username,'password_changed');json(res,200,{ok:true});return;}
@@ -254,7 +313,7 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
    if(req.method==='GET'){json(res,200,{...lead,payload:JSON.parse(lead.payload),files:db.prepare('SELECT id,name,size FROM files WHERE lead_id=?').all(lead.id),notifications:db.prepare('SELECT id,kind,channel,state,attempts,last_error,sent_at FROM outbox WHERE lead_id=?').all(lead.id)});return;}
    if(req.method==='PATCH'){const b=await jsonBody(req,15000);if(!STATUSES[b.status])throw fail(422,'Выберите статус.');const note=text(b.note||'',10000);if(b.revision!==lead.revision)throw fail(409,'Заявка изменена в другой вкладке. Откройте её заново.');const f=updateFollowup(lead,b);db.prepare('UPDATE leads SET status=?,note=?,assignee=?,next_contact=?,next_action=?,revision=revision+1 WHERE id=?').run(b.status,note,f.assignee,f.nextContact,f.nextAction,lead.id);audit(s.username,'lead_updated',lead.id);json(res,200,{ok:true,revision:lead.revision+1});return;}
    if(req.method==='POST'&&match[2]){db.prepare("UPDATE outbox SET state='pending',attempts=0,next_try=0,last_error='' WHERE lead_id=? AND state IN ('failed','pending')").run(lead.id);audit(s.username,'notification_retry',lead.id);void flushMail();json(res,200,{ok:true});return;}
-   if(req.method==='DELETE'){const files=db.prepare('SELECT id FROM files WHERE lead_id=?').all(lead.id);transaction(()=>{db.prepare('DELETE FROM leads WHERE id=?').run(lead.id);audit(s.username,'lead_deleted',lead.id);});for(const f of files)await rm(path.join(DATA,'uploads',f.id),{force:true});json(res,200,{ok:true});return;}
+   if(req.method==='DELETE'){const quoteFiles=db.prepare('SELECT file_key FROM quote_versions WHERE lead_id=?').all(lead.id);const files=db.prepare('SELECT id FROM files WHERE lead_id=?').all(lead.id);transaction(()=>{db.prepare('DELETE FROM leads WHERE id=?').run(lead.id);audit(s.username,'lead_deleted',lead.id);});for(const f of files)await rm(path.join(DATA,'uploads',f.id),{force:true});for(const f of quoteFiles)if(/^quotes\/[a-f0-9-]{36}\.pdf$/.test(f.file_key))await rm(path.join(DATA,f.file_key),{force:true});json(res,200,{ok:true});return;}
   }
   const fileMatch=route.match(/^\/api\/admin\/files\/([a-f0-9-]{36})$/);if(fileMatch&&req.method==='GET'){const f=db.prepare('SELECT * FROM files WHERE id=?').get(fileMatch[1]);if(!f)throw fail(404,'Файл не найден.');audit(s.username,'file_downloaded',f.lead_id);if(await serveFile(req,res,path.join(DATA,'uploads',f.id),{'Content-Disposition':disposition(f.name),'Content-Type':'application/octet-stream','Cache-Control':'no-store'}))return;throw fail(404,'Файл недоступен.');}
   throw fail(404,'Действие не найдено.');
@@ -268,7 +327,7 @@ const server=http.createServer(async(req,res)=>{headers(res);let url;try{url=new
   if(relative.split('/').some(p=>p.startsWith('.')||p==='..')||relative.includes('\0')||relative.includes('\\'))throw fail(404,'Страница не найдена.');
   const generated=relative.endsWith('.html')&&!relative.startsWith('admin/')||relative==='sitemap.xml'||relative.startsWith('bundles/');
   const root=generated?activePublic:site;
-  const file=path.resolve(root,relative);if(file.startsWith(root+path.sep)&&await serveFile(req,res,file,relative.startsWith('admin/')?{'X-Robots-Tag':'noindex, nofollow','Cache-Control':'no-store'}:{}))return;
+  const file=path.resolve(root,relative);const privateHeaders=relative==='followup.html'?{'X-Robots-Tag':'noindex, nofollow','Referrer-Policy':'no-referrer','Cache-Control':'no-store'}:relative.startsWith('admin/')?{'X-Robots-Tag':'noindex, nofollow','Cache-Control':'no-store'}:{};if(file.startsWith(root+path.sep)&&await serveFile(req,res,file,privateHeaders))return;
  }
  res.writeHead(404,{'Content-Type':'text/html; charset=utf-8'});res.end(await readFile(path.join(activePublic,'404.html')));
  }catch(e){if(res.headersSent){res.end();return;}const status=e.status||500;json(res,status,{error:status<500?e.message:'Не удалось выполнить действие. Попробуйте ещё раз.'});if(status>=500)console.error('Request failed:',e.name);}});

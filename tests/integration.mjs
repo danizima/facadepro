@@ -39,10 +39,10 @@ try{
  const list=await (await call('/api/admin/leads',{auth:true})).json();assert.equal(list.total,1);const id=list.rows[0].id;
  const detail=await (await call('/api/admin/leads/'+id,{auth:true})).json();assert.equal(detail.files.length,1);assert.equal(detail.payload.company,p.company);
  const fileId=detail.files[0].id;assert.equal((await call('/api/admin/files/'+fileId)).status,401,'private attachment');response=await call('/api/admin/files/'+fileId,{auth:true});assert.equal(response.status,200);assert.match(response.headers.get('content-disposition'),/^attachment/);assert.match(await response.text(),/^%PDF-/);
- response=await call('/api/admin/leads/'+id,{method:'PATCH',auth:true,body:{status:'estimate',note:'Готовим предложение',revision:1}});assert.equal(response.status,200);
- assert.equal((await call('/api/admin/leads/'+id,{method:'PATCH',auth:true,body:{status:'won',note:'',revision:1}})).status,409,'stale revision blocked');
+ response=await call('/api/admin/leads/'+id,{method:'PATCH',auth:true,body:{status:'estimate',note:'Готовим предложение',revision:detail.revision}});assert.equal(response.status,200);
+ assert.equal((await call('/api/admin/leads/'+id,{method:'PATCH',auth:true,body:{status:'won',note:'',revision:detail.revision}})).status,409,'stale revision blocked');
  const people=await (await call('/api/admin/staff',{auth:true})).json();assert.deepEqual(people.staff,['tester']);
- const follow=async value=>call('/api/admin/leads/'+id,{method:'PATCH',auth:true,body:{status:'estimate',note:'Проверка следующего шага',revision:2,...value}});
+ const follow=async value=>call('/api/admin/leads/'+id,{method:'PATCH',auth:true,body:{status:'estimate',note:'Проверка следующего шага',revision:detail.revision+1,...value}});
  assert.equal((await follow({assignee:'missing',next_contact:'',next_action:''})).status,422,'unknown owner rejected');
  assert.equal((await follow({assignee:'tester',next_contact:'2026-02-30',next_action:'Позвонить'})).status,422,'invalid date rejected');
  assert.equal((await follow({assignee:'tester',next_contact:'2026-09-23',next_action:''})).status,422,'reminder requires action');
@@ -68,7 +68,7 @@ try{
  await stop();await start();assert.equal((await (await call('/api/admin/leads',{auth:true})).json()).total,1,'leads persist');assert.equal((await call('/projects/integration-new.html')).status,200,'content persists');
  for(let i=0;i<80&&received.length<2;i++)await delay(50);assert.equal(received.length,2,'manager and visitor SMTP messages');assert.ok(received.every(m=>m.includes('Message-ID:')));
  const after=await (await call('/api/admin/leads/'+id,{auth:true})).json();assert.equal(after.status,'estimate');assert.equal(after.assignee,'tester');assert.equal(after.next_contact,'2026-09-22');assert.equal(after.next_action,'Уточнить чертежи');assert.equal(after.payload.solution,'new');assert.ok(after.notifications.every(x=>x.state==='sent'));
- response=await call('/api/admin/leads/'+id,{method:'PATCH',auth:true,body:{status:'closed',note:'Готово',revision:3}});assert.equal(response.status,200);assert.equal((await (await call('/api/admin/reminders?today=2026-09-23',{auth:true})).json()).overdue,0,'closed leads excluded from reminders');
+ response=await call('/api/admin/leads/'+id,{method:'PATCH',auth:true,body:{status:'closed',note:'Готово',revision:after.revision}});assert.equal(response.status,200);assert.equal((await (await call('/api/admin/reminders?today=2026-09-23',{auth:true})).json()).overdue,0,'closed leads excluded from reminders');
  response=await call('/api/admin/leads/'+id,{method:'DELETE',auth:true});assert.equal(response.status,200);assert.equal((await call('/api/admin/files/'+fileId,{auth:true})).status,404,'deleted attachment inaccessible');
  response=await call('/api/admin/logout',{method:'POST',auth:true,body:{}});assert.equal(response.status,200);assert.equal((await call('/api/admin/leads',{auth:true})).status,401,'logout invalidates session');
  console.log('PASS: request + private files + idempotency + authentication + CSRF + status/revisions + publishing + uploads + persistence + analytics + SMTP + deletion + followups + owner/date validation + PDF selection + hidden projects');

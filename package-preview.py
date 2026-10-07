@@ -13,8 +13,8 @@ seed=json.loads((root/'source/content.json').read_text())
 public_projects=[p for p in seed['projects'] if p.get('published') is not False][:20]
 portfolio=render_portfolio({'projects':public_projects,'settings':seed['settings'],'recipient':''})
 downloads={'portfolio.pdf':'data:application/pdf;base64,'+base64.b64encode(portfolio).decode()}
-css='\n'.join((site/name).read_text() for name in ['styles.css','enhancements.css','business.css','release4.css','visual5.css','museum.css','release6.css','release7.css','release8.css','release9.css','visual10.css','release103.css','release11.css','release12.css','release13.css','vendor/leaflet/leaflet.css'])
-app='\n'.join((site/name).read_text() for name in ['vendor/leaflet/leaflet.js','app.js','public.js','request.js','release4.js','visual5.js','museum.js','release6.js','release7.js','release8.js','release9.js','visual10.js','photo-request.js','release11.js','release12.js'])
+css='\n'.join((site/name).read_text() for name in ['styles.css','enhancements.css','business.css','release4.css','visual5.css','museum.css','release6.css','release7.css','release8.css','release9.css','visual10.css','release103.css','release11.css','release12.css','release13.css','services14.css','followup14.css','budget14.css','vendor/leaflet/leaflet.css'])
+app='\n'.join((site/name).read_text() for name in ['vendor/leaflet/leaflet.js','app.js','public.js','request.js','release4.js','visual5.js','museum.js','release6.js','release7.js','release8.js','release9.js','visual10.js','photo-request.js','release11.js','release12.js','budget14.js'])
 pages={}
 for path in site.rglob('*.html'):
  if path.name.startswith('_') or 'admin' in path.relative_to(site).parts:continue

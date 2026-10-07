@@ -53,6 +53,10 @@ class MediaRelease(unittest.TestCase):
                 continue
             parser = Head()
             parser.feed(page.read_text())
+            if page.name == 'followup.html':
+                self.assertIn('noindex', parser.meta.get('robots', ''))
+                self.assertEqual(parser.meta.get('referrer'), 'no-referrer')
+                continue
             url = parser.meta.get('og:image')
             self.assertTrue(url, str(page))
             self.assertEqual(urlparse(url).netloc, 'facadepro.ru')

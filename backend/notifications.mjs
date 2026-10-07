@@ -82,6 +82,6 @@ export function reminderStillRelevant(row,lead,now=new Date()){
  return lead.status==='new'&&new Date(lead.created).getTime()<=now.getTime()-c.reminderMinutes*60000;
 }
 export function telegramMessage(row,lead){
- const title=row.kind==='reminder_new'?'Заявка ещё не обработана':row.kind==='reminder_due'?'Напоминание о контакте':'Новая заявка';
+ const title=row.kind==='addition'?'Дополнение к заявке':row.kind==='reminder_new'?'Заявка ещё не обработана':row.kind==='reminder_due'?'Напоминание о контакте':'Новая заявка';
  return title+' '+lead.reference+'\n'+(lead.assignee?'Ответственный: '+lead.assignee+'\n':'')+(process.env.PUBLIC_URL||'')+'/admin/#leads/'+lead.id;
 }

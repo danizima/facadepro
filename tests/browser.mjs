@@ -10,6 +10,9 @@ import {verifyRelease10} from './browser10.mjs';
 import {verifyRelease102} from './browser102.mjs';
 import {verifyRelease12} from './browser12.mjs';
 import {verifyRelease13} from './browser13.mjs';
+import {verifyRelease14} from './browser14.mjs';
+import {verifyBudget14} from './browser-budget14.mjs';
+import {verifyCRM14} from './browser-crm14.mjs';
 import {verifyRelease11} from './browser11.mjs';
 import {verifyRelease103} from './browser103.mjs';
 const require=createRequire(import.meta.url),{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
@@ -35,7 +38,7 @@ try{
  await page.locator('#compare-result>.button').click();await page.locator('input[name=comparedProjects]').waitFor({state:'attached'});assert.equal((await page.locator('input[name=comparedProjects]').inputValue()).split(',').length,3);
  await page.goto(base+'/projects/museum.html',{waitUntil:'networkidle'});await page.locator('[data-detail-pin]').first().click();assert.equal(await page.locator('.detail-note.is-active').count(),1);await page.locator('[data-report-year="2025"]').click();assert.equal(await page.locator('.report-entry:visible').count(),2);await page.locator('[data-report-photo]:visible').first().click();await page.locator('.report-viewer').waitFor({state:'visible'});await page.keyboard.press('Escape');
  await page.goto(base+'/admin/',{waitUntil:'networkidle'});await page.locator('[name=username]').fill('browser-tester');await page.locator('[name=password]').fill(password);await page.locator('#login-form [type=submit]').click();await page.locator('#admin-shell').waitFor({state:'visible'});
- await page.locator('[data-lead]').first().click();await page.locator('#lead-edit').waitFor();assert.match(await page.locator('#admin-view').innerText(),/Обратный звонок/);assert.match(await page.locator('#admin-view').innerText(),/После 14:00/);
+ await page.locator('[data-lead]:visible').first().click();await page.locator('#lead-edit').waitFor();assert.match(await page.locator('#admin-view').innerText(),/Обратный звонок/);assert.match(await page.locator('#admin-view').innerText(),/После 14:00/);
  await page.locator('[data-tab=projects]').click();await page.locator('[data-project-edit=museum]').click();await page.locator('#preview-project').click();await page.locator('#preview-dialog').waitFor({state:'visible'});await page.frameLocator('#preview-frame').locator('h1').waitFor();await page.locator('#close-preview').click();await page.locator('#close-project').click();
  await page.locator('[data-tab=materials]').click();await page.locator('#add-material').click();await page.locator('#materials-form [data-field=title]').fill('Проверка отзыва');await page.locator('#materials-form [data-field=text]').fill('Тестовая запись для проверки интерфейса.');await page.locator('#materials-form [data-field=author]').fill('Тестовый автор');await page.locator('#materials-form [type=submit]').click();await page.locator('#admin-status').filter({hasText:'Материалы сохранены'}).waitFor();
  await page.locator('[data-tab=showcases]').click();await page.locator('#new-showcase').click();await page.locator('[data-select-project=museum]').check();await page.locator('[data-select-project=restaurant]').check();await page.locator('#share-form [type=submit]').click();await page.locator('.showcase-list article').waitFor();
@@ -48,6 +51,9 @@ try{
  await verifyRelease11({page,base,shots});
  await verifyRelease12({page,base,shots});
  await verifyRelease13({page,base,shots});
+ await verifyRelease14({page,base,shots});
+ await verifyBudget14({page,base,shots});
+ await verifyCRM14({page,base,shots});
  for(const width of [390,320]){
   await page.setViewportSize({width,height:844});
   for(const route of ['/', '/compare.html?projects=museum,burny','/projects/museum.html','/request.html','/admin/']){
