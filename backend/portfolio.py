@@ -62,17 +62,20 @@ class ProjectQR(Flowable):
 
 def render(job):
  projects=job['projects'];s=job['settings'];recipient=job.get('recipient','');result=BytesIO()
+ phone=s.get('phone') or ''
  sources=json.loads((ROOT/'source/photo-sources.json').read_text())['photos']
  credits={r['asset'][:-5]:r['credit'] for r in sources}
  def credit(p):
   return para('Фото: '+credits[p['images'][0]],'small') if p['images'] and p['images'][0] in credits else Spacer(1,3)
  def page(c,doc):
   c.saveState();c.setFillColor(INK);c.setFont('FacadeBold',17);c.drawString(M,H-37,'ФАСАД.PRO');c.setFillColor(MUTE);c.setFont('Facade',7);c.drawRightString(W-M,H-34,'ФАСАДЫ ЛЮБОЙ СЛОЖНОСТИ')
-  c.setStrokeColor(LINE);c.line(M,H-51,W-M,H-51);c.line(M,43,W-M,43);c.setFont('Facade',7);c.drawString(M,29,s['email']);c.drawCentredString(W/2,29,s['phone']);c.drawRightString(W-M,29,f'{doc.page:02}');c.restoreState()
+  c.setStrokeColor(LINE);c.line(M,H-51,W-M,H-51);c.line(M,43,W-M,43);c.setFont('Facade',7);c.drawString(M,29,s['email']);c.drawRightString(W-M,29,f'{doc.page:02}')
+  if phone:c.drawCentredString(W/2,29,phone)
+  c.restoreState()
  doc=SimpleDocTemplate(result,pagesize=A4,rightMargin=M,leftMargin=M,topMargin=78,bottomMargin=61,title='ФАСАД.PRO - портфолио проектов',author='ФАСАД.PRO',pageCompression=1)
  story=[para('ПОРТФОЛИО ПРОЕКТОВ / 2026','kicker'),para(s['slogan'],'title')]
  if recipient:story+=[para(recipient,'large')]
- story += [Spacer(1,8),*([picture(projects[0]['images'][0],265),Spacer(1,8),credit(projects[0])] if projects[0]['images'] else []),Spacer(1,22),para('Архитектура. Наше участие.','large'),para(f"В подборке: {len(projects)} объектов. Остекление, монтаж и восстановление фасадов. Состав и период участия — на страницах проектов.",'body'),para(s['phone']+'  ·  '+s['email'],'small'),PageBreak()]
+ story += [Spacer(1,8),*([picture(projects[0]['images'][0],265),Spacer(1,8),credit(projects[0])] if projects[0]['images'] else []),Spacer(1,22),para('Архитектура. Наше участие.','large'),para(f"В подборке: {len(projects)} объектов. Остекление, монтаж и восстановление фасадов. Состав и период участия — на страницах проектов.",'body'),para('  ·  '.join(filter(None,(phone,s['email']))),'small'),PageBreak()]
  for index,p in enumerate(projects):
   if not re.fullmatch(r'[a-z0-9-]+',p['id']):raise ValueError('Invalid project id')
   url='https://facadepro.ru/projects/'+p['id']+'.html'
@@ -96,7 +99,7 @@ def render(job):
    for label,value in narrative:
     story += [KeepTogether([para(label.upper(),'kicker'),para(value)]),Spacer(1,12)]
   story += [KeepTogether([Spacer(1,10),qr]),PageBreak()]
- story += [para('ОБСУДИМ ВАШ ПРОЕКТ','kicker'),para('Начнём<br/>с вашей задачи.'.replace('<br/>','\n'),'title'),Spacer(1,22),para('Ваш менеджер','kicker'),para(s['manager'],'project'),para(s['phone'],'large'),para(s['email'],'large'),Spacer(1,30),para('Владивосток','kicker'),para(s['vladivostok'],'body'),Spacer(1,15),para('Москва','kicker'),para(s['moscow'],'body'),Spacer(1,30),para(s['legalName'],'small'),para(f'ИНН {s["inn"]}  ·  КПП {s["kpp"]}','small')]
+ story += [para('ОБСУДИМ ВАШ ПРОЕКТ','kicker'),para('Начнём<br/>с вашей задачи.'.replace('<br/>','\n'),'title'),Spacer(1,22),para('Контакты по проекту','kicker'),para(s['manager'],'project'),*([para(phone,'large')] if phone else []),para(s['email'],'large'),Spacer(1,30),para('Владивосток','kicker'),para(s['vladivostok'],'body'),Spacer(1,15),para('Москва','kicker'),para(s['moscow'],'body'),Spacer(1,30),para(s['legalName'],'small'),para(f'ИНН {s["inn"]}  ·  КПП {s["kpp"]}','small')]
  if s.get('ogrn'):story.append(para('ОГРН '+s['ogrn'],'small'))
  story.append(para('facadepro.ru','large'))
  doc.build(story,onFirstPage=page,onLaterPages=page)

@@ -2,6 +2,7 @@ import {upgradeContent,validateExtras,validateWorkflow} from './content6.mjs';
 import {validateMaterials} from './content7.mjs';
 import {applyPortfolioUpdate} from './portfolio-update.mjs';
 import {applyContentUpdate13} from './content-update13.mjs';
+import {publicContact,removeRetiredContacts} from './retired-contact.mjs';
 import {DatabaseSync} from 'node:sqlite';
 import {mkdirSync,readFileSync,writeFileSync,existsSync} from 'node:fs';
 import path from 'node:path';
@@ -37,6 +38,7 @@ if(!db.prepare('SELECT id FROM content WHERE id=1').get())db.prepare('INSERT INT
 applyPortfolioUpdate(db,JSON.parse(readFileSync(path.join(ROOT,'source/portfolio-update10-2.json'),'utf8')));
 applyPortfolioUpdate(db,JSON.parse(readFileSync(path.join(ROOT,'source/portfolio-update11.json'),'utf8')));
 applyContentUpdate13(db,JSON.parse(readFileSync(path.join(ROOT,'source/portfolio-update13.json'),'utf8')));
+removeRetiredContacts(db);
 export const hash=x=>createHash('sha256').update(x).digest('hex');
 export const privateHash=x=>createHmac('sha256',secret).update(x).digest('hex');
 export function passwordHash(password){const salt=randomBytes(16).toString('hex');return salt+':'+scryptSync(password,salt,64).toString('hex');}
@@ -55,10 +57,12 @@ export const emailOK=s=>/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(s)&&s.length<=20
 export function validateContent(input){
  if(!input||!Array.isArray(input.projects)||input.projects.length>100)throw fail(422,'Допустимо до 100 проектов.');
  const s=input.settings||{},settings={};
- for(const key of ['slogan','manager','phone','email','vladivostok','moscow','legalName','inn','kpp'])settings[key]=text(s[key],250,true);
+ for(const key of ['slogan','manager','email','vladivostok','moscow','legalName','inn','kpp'])settings[key]=text(s[key],250,true);
+ settings.phone=text(s.phone??'',40);
+ Object.assign(settings,publicContact(settings.manager,settings.phone));
  settings.ogrn=text(s.ogrn||'',13);
  if(settings.ogrn&&!/^\d{13}$/.test(settings.ogrn))throw fail(422,'ОГРН должен содержать 13 цифр.');
- if(!emailOK(settings.email)||!/^[+\d\s().-]{7,40}$/.test(settings.phone)||!/^\d{10}$/.test(settings.inn)||!/^\d{9}$/.test(settings.kpp))throw fail(422,'Проверьте телефон, email и реквизиты.');
+ if(!emailOK(settings.email)||(settings.phone&&!/^[+\d\s().-]{7,40}$/.test(settings.phone))||!/^\d{10}$/.test(settings.inn)||!/^\d{9}$/.test(settings.kpp))throw fail(422,'Проверьте телефон, email и реквизиты.');
  const ids=new Set();const projects=input.projects.map(p=>{
   if(!/^[a-z0-9][a-z0-9-]{1,59}$/.test(p.id)||ids.has(p.id))throw fail(422,'Адреса проектов должны быть уникальными: латинские буквы, цифры и дефис.');ids.add(p.id);
   const out={id:p.id,published:p.published!==false};

@@ -35,6 +35,7 @@ def pages(g):
     """This route intentionally loads only its own controller, without analytics."""
     e, cfg = g['e'], g['CFG']
     phone = re.sub(r'[^+0-9]', '', cfg['phone'])
+    phone_link = f'<a href="tel:{phone}">{e(cfg["phone"])}</a>' if phone else ''
     body = '''<header class="followup-header"><a href="index.html" aria-label="ФАСАД.PRO — на главную"><img src="assets/logo.svg" width="160" height="44" alt="ФАСАД.PRO"></a><span>Ваше обращение</span></header>
 <main id="main" class="followup-main"><div class="followup-intro"><p class="eyebrow">Личная страница проекта</p><h1>Продолжим<br>работу над задачей.</h1><p>Здесь можно передать дополнительные материалы и посмотреть следующий шаг.</p></div>
 <p id="followup-load-status" class="followup-load-status" role="status" tabindex="-1">Открываем обращение…</p><button class="text-button" id="followup-retry" type="button" hidden>Повторить загрузку</button>
@@ -47,7 +48,7 @@ def pages(g):
 <section class="followup-history" aria-labelledby="followup-history-title"><p class="eyebrow">Полученные дополнения</p><h2 id="followup-history-title">История материалов.</h2><div id="followup-updates"></div></section>
 <section class="followup-save"><p>Сохраните личную ссылку, чтобы вернуться к обращению.</p><div><button class="text-button" id="followup-copy-link" type="button">Скопировать ссылку</button><button class="text-button" id="followup-save-link" type="button">Сохранить ссылку ↓</button></div><p class="privacy-note">Личная ссылка открывает доступ к обращению. Передавайте её только участникам вашего проекта.</p><p id="followup-link-status" role="status"></p></section></div>
 <noscript><p>Для личной страницы включите JavaScript или свяжитесь с менеджером.</p></noscript></main>'''
-    body += '<footer class="followup-footer"><a href="tel:'+phone+'">'+e(cfg['phone'])+'</a><a href="mailto:'+e(cfg['email'])+'">'+e(cfg['email'])+'</a><a href="privacy.html">Обработка данных</a><span>© 2026 ФАСАД.PRO</span></footer>'
+    body += '<footer class="followup-footer">'+phone_link+'<a href="mailto:'+e(cfg['email'])+'">'+e(cfg['email'])+'</a><a href="privacy.html">Обработка данных</a><span>© 2026 ФАСАД.PRO</span></footer>'
     content = '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer"><meta name="theme-color" content="#252525"><title>Ваше обращение — ФАСАД.PRO</title><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="followup14.css"><script src="followup14.js" defer></script></head><body class="followup-page">'+body+'</body></html>'
     (g['OUT']/'followup.html').write_text(content)
     for name in ('followup14.js', 'followup14.css'):

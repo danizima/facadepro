@@ -8,7 +8,14 @@ def contact(g, base, route):
     project = g['PBY'].get(route.split('/')[-1][:-5]) if route.startswith('projects/') else None
     query = '?project=' + project['id'] if project else ''
     phone = re.sub(r'[^+0-9]', '', g['CFG']['phone'])
-    return f'''<dialog class="contact-dialog" id="contact-dialog" aria-labelledby="contact-title"><button type="button" class="contact-close" data-contact-close aria-label="Закрыть выбор способа связи">Закрыть ×</button><p class="eyebrow">Ваш следующий объект</p><h2 id="contact-title">Как вам удобнее<br>начать разговор?</h2><p class="contact-context">{('Похожий проект: '+e(project['title'])) if project else 'Выберите способ связи. Начнём с тех материалов, которые у вас уже есть.'}</p><div class="contact-options"><a href="tel:{phone}"><span class="contact-option-number">01</span><div><strong>Позвонить менеджеру</strong><span>{e(g['CFG']['manager'])}<br>{e(g['CFG']['phone'])}</span></div>{g['ARROW']}</a><a href="{base}photo-request.html{query}" data-contact-photo><span class="contact-option-number">02</span><div><strong>Показать фотографии</strong><span>Фото объекта и ваш телефон</span></div>{g['ARROW']}</a><a href="{base}request.html{query}" data-contact-project><span class="contact-option-number">03</span><div><strong>Отправить проект</strong><span>Чертежи, объёмы и описание задачи</span></div>{g['ARROW']}</a></div><a class="contact-email-link" href="mailto:{e(g['CFG']['email'])}">{e(g['CFG']['email'])}</a></dialog>'''
+    email = e(g['CFG']['email'])
+    if phone:
+        primary = f'<a href="tel:{phone}"><span class="contact-option-number">01</span><div><strong>Позвонить менеджеру</strong><span>{e(g["CFG"]["manager"])}<br>{e(g["CFG"]["phone"])}</span></div>{g["ARROW"]}</a>'
+        email_link = f'<a class="contact-email-link" href="mailto:{email}">{email}</a>'
+    else:
+        primary = f'<a href="mailto:{email}"><span class="contact-option-number">01</span><div><strong>Написать на почту</strong><span>{email}</span></div>{g["ARROW"]}</a>'
+        email_link = ''
+    return f'''<dialog class="contact-dialog" id="contact-dialog" aria-labelledby="contact-title"><button type="button" class="contact-close" data-contact-close aria-label="Закрыть выбор способа связи">Закрыть ×</button><p class="eyebrow">Ваш следующий объект</p><h2 id="contact-title">Как вам удобнее<br>начать разговор?</h2><p class="contact-context">{('Похожий проект: '+e(project['title'])) if project else 'Выберите способ связи. Начнём с тех материалов, которые у вас уже есть.'}</p><div class="contact-options">{primary}<a href="{base}photo-request.html{query}" data-contact-photo><span class="contact-option-number">02</span><div><strong>Показать фотографии</strong><span>Фото объекта и ваш телефон</span></div>{g['ARROW']}</a><a href="{base}request.html{query}" data-contact-project><span class="contact-option-number">03</span><div><strong>Отправить проект</strong><span>Чертежи, объёмы и описание задачи</span></div>{g['ARROW']}</a></div>{email_link}</dialog>'''
 
 
 def comparison(g, project):

@@ -30,8 +30,10 @@ def profile_pdf(job):
     story = [para('ДЛЯ ЗНАКОМСТВА И ПОДГОТОВКИ ПРЕДЛОЖЕНИЯ','kicker'),
              para('Карточка компании','project'), para(s['legalName'],'large')]
     rows = [('ИНН / КПП',s['inn']+' / '+s['kpp']),('Офис во Владивостоке',s['vladivostok']),
-            ('Офис в Москве',s['moscow']),('Ваш менеджер',s['manager']),
-            ('Телефон',s['phone']),('Электронная почта',s['email'])]
+            ('Офис в Москве',s['moscow']),('Контакты по проекту',s['manager'])]
+    if s.get('phone'):
+        rows.append(('Телефон',s['phone']))
+    rows.append(('Электронная почта',s['email']))
     if s.get('ogrn'):
         rows.insert(1, ('ОГРН', s['ogrn']))
     table=Table([[para(k,'label'),para(v,'fact')] for k,v in rows], colWidths=[145,CW-145])
@@ -72,7 +74,7 @@ def render_kit(job):
         manifest=['ФАСАД.PRO - пакет подрядчика','Сформировано: '+job['date'],'Версия сайта: '+job['version'],'',
                   'Состав пакета:',*['- '+name+': '+title for name,title in entries],'',
                   'Документы и портфолио актуальны на момент формирования.','Другие сведения для проверки подрядчика можно запросить у менеджера.',
-                  '',s['manager'],s['phone'],s['email'],'https://facadepro.ru/contractors.html']
+                  '',*filter(None,(s['manager'],s.get('phone'),s['email'])),'https://facadepro.ru/contractors.html']
         archive.writestr('Состав_пакета.txt','\ufeff'+'\n'.join(manifest))
     return result.getvalue()
 

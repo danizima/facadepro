@@ -26,11 +26,13 @@ def metadata(g, route, title, description):
         image = key if key.startswith('media/') else 'assets/' + key + '.webp'
         image_alt = unescape(str(projects['museum']['title']))
     company = {'@type': 'Organization', '@id': ORIGIN + '#company', 'name': 'ФАСАД.PRO',
-               'legalName': settings['legalName'], 'url': ORIGIN, 'telephone': settings['phone'],
+               'legalName': settings['legalName'], 'url': ORIGIN,
                'email': settings['email'], 'logo': ORIGIN + 'assets/company-social.png',
                'taxID': settings['inn'], 'address': [
                    {'@type': 'PostalAddress', 'addressCountry': 'RU', 'addressLocality': 'Владивосток', 'streetAddress': settings['vladivostok']},
                    {'@type': 'PostalAddress', 'addressCountry': 'RU', 'addressLocality': 'Москва', 'streetAddress': settings['moscow']} ]}
+    if settings.get('phone', '').strip():
+        company['telephone'] = settings['phone']
     if settings.get('ogrn'):
         company['identifier'] = {'@type': 'PropertyValue', 'propertyID': 'ОГРН', 'value': settings['ogrn']}
     graph = [company]
